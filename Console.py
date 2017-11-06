@@ -6,6 +6,7 @@ import platform as pt
 import socket
 
 localuser = getuser()
+remote_cmdip = 'localhost'
 win_pt = "windows" in pt.platform().lower()
 
 global udp_tx_setup, udp_rx_setup
@@ -19,12 +20,22 @@ def _cls():
 
 def helper():
 	print("************************Controller Helper************************")
-	print("                 [LS] Current Client Process						")
-	print("                 [ADD] Add a Client								")
-	print("                 [SC] Execute Script File						")
-	print("                 [CLS/CLEAR] Clear screen						")
-	print("                 [EXIT] Exit										")
+	print("                 [LS]    Current Client Process					")
+	print("                 [ADD]   Add a Client							")
+	print("                 [SC]    Execute Script File						")
+	print("                 [CLS]   Clear screen							")
+	print("                 [EXIT]  Exit									")
 	print
+	pass
+
+def cmd_parse(str):
+	cmd = ''
+	op_tuple = str.lower().split(' ', 1)
+	op = op_tuple[0]
+	if len(op_tuple) > 1:
+		cmd = op_tuple[1].split(' ')
+		pass
+	return op, cmd
 	pass
 
 def script_file(file):
@@ -40,35 +51,35 @@ def main():
 	helper()
 	while True:
 		tipstr = localuser+"@Aggregator["+time.ctime()+"]> "
-		cmd = raw_input(tipstr).lower().split()
+		op, cmd = cmd_parse(raw_input(tipstr))
 
 		try:
-			if cmd[0]=='ls':
+			if op=='ls':
 				skt_cmd.sendto('ls', udp_tx_setup)
 				data, ADDR = skt_recv.recvfrom(1024)
 				_cls()
-				print(data)
-				print
+				print("%s\n"%(data))
 				helper()
 				pass
-			elif cmd[0]=='add' and len(cmd)>=3:
-				tmp = (" ").join(("add", cmd[1], cmd[2]))
+			elif op=='add' and len(cmd)>=2:
+				#'<command> <ip1>;<ip2>'
+				tmp = ('%s %s;%s'%("add", cmd[0], cmd[1]))
 				skt_cmd.sendto(tmp, udp_tx_setup)
 				print(tmp)
 				pass
-			elif cmd[0]=='sc' and len(cmd)>=2:
+			elif op=='sc' and len(cmd)>=1:
 				script_file(cmd[1])
 				pass
-			elif cmd[0]=='clear' or cmd[0]=='cls':
+			elif op=='clear' or op=='cls':
 				_cls()
 				helper()
 				pass
-			elif cmd[0]=='exit':
+			elif op=='exit':
 				print
 				quit()
 				pass
 			else:
-				print("No Kidding...")
+				print("\t\tNot Supported Format or Instruction...\n")
 			pass
 		except Exception as e:
 			#raise e ##for debug
@@ -79,6 +90,11 @@ def main():
 
 if __name__ == '__main__':
 	udp_tx_setup = ('localhost', 11112)
-	udp_rx_setup = ('localhost', 11111)
+	udp_rx_setup = (remote_cmdip, 11111)
 
-	main()
+	try:
+		main()
+	except Exception as e:
+		_cls()
+	finally:
+		exit()
