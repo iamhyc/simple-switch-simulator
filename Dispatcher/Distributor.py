@@ -20,12 +20,8 @@ class Distributor(Process):
 		self.p2c_q, self.fb_q = queue
 		self.wifi_ip, self.vlc_ip, self.port = char
 		self.ops_map = {
-			#"set":self.setValue,
-			"fb":self.setQueueFB,
+			"set":self.setValue,
 			"ratio":self.setRatio,
-			"switch":self.switch,
-			"start":self.start,
-			"stop":self.stop
 		}
 		#2 Source Thread Init
 		self.setSource("static")
@@ -34,7 +30,6 @@ class Distributor(Process):
 		self.buffer = Queue()
 		self.wifi_q = Queue()
 		self.vlc_q = Queue()
-		self.fb_q = Queue()
 		pass
 	
 	def cmd_parse(self, str):
@@ -46,14 +41,11 @@ class Distributor(Process):
 			pass
 		return op, cmd
 
-	def setQueueFB(self, cmd):
-		self.c2p_q.put(' '.join(task_id, cmd))
-		pass
-
 	def setValue(self, tuple):
 		pass
 
 	def setRatio(self, ratio):
+		#Ratio, Start, Stop, Switch
 		pass
 
 	def setSource(self, type):
@@ -68,8 +60,8 @@ class Distributor(Process):
 		while True:
 			try:
 				data = fb_skt.recv(1024)
-				op, cmd = cmd_parse(data)
-				self.ops_map[op](cmd)
+				#push into queue straightly
+				self.c2p_q.put(' '.join(task_id, cmd))
 				pass
 			except Exception as e:
 				pass
