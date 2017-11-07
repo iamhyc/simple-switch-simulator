@@ -10,6 +10,20 @@ import thread
 import socket, select
 import binascii
 
+class RatioCounter:
+	"""docstring for RatioCounter"""
+	def __init__(self, left, right):
+		self.left = left
+		self.right = right
+		self.count = 0
+	
+	def setRatio(self, ratio):
+		#Ratio, Start, Stop, Switch
+		#need a <Counter Class> first
+		pass
+
+	def next():
+		pass
 
 class Distributor(Process):
 	"""Non-Blocking running Distributor Process
@@ -20,17 +34,19 @@ class Distributor(Process):
 		@var queue:
 			multiprocess control side
 	"""
-	udp_wifi_port = 11112#self To port
-	udp_vlc_port = 11113#self To port
+	udp_src_port	= 12300
+	udp_wifi_port	= 11112 #self To port
+	udp_vlc_port	= 11113 #self To port
 
 	def __init__(self, char, queue):
 		#1 Internal Init
 		Process.__init__(self)
 		self.p2c_q, self.fb_q = queue
 		self.wifi_ip, self.vlc_ip, self.port = char
+		self.counter = RatioCounter()
 		self.ops_map = {
 			"set":self.setValue,
-			"ratio":self.setRatio,
+			"ratio":self.counter.setRatio,
 		}
 		#2 Socket Init
 		self.setSource("static")
@@ -55,21 +71,7 @@ class Distributor(Process):
 	def setValue(self, tuple):
 		pass
 
-	def setRatio(self, ratio):
-		#Ratio, Start, Stop, Switch
-		#need a <Counter Class> first
-		pass
-
 	def setSource(self, src):
-		if src=='static':
-			self.buffer.put("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-			pass
-		elif src=='file':
-			pass
-		elif src=='udp':
-			pass
-		else:
-			pass
 		pass
 
 	def _start():
@@ -103,11 +105,27 @@ class Distributor(Process):
 		pass
 
 	def sourceThread(self, src):
+		src_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		src_skt.setblocking(0)
+		src_skt.bind(('', udp_src_port)) 
 		while True:
+			try:
+				data = src_skt.recv(1024)
+				self.buffer.put_nowait(data)
+			except Exception as e:
+				pass
 			sleep(0)#surrender turn
 		pass
 
 	def distXmitThread():
+		while True:
+			if not self.buffer.empty():
+				data = self.buffer.get_nowait()
+				header, q_id = self.counter.next()
+				q_id.put_nowait(header + data)
+				pass
+			sleep(0)#surrender turn
+			pass
 		pass
 
 	def vlcXmitThread(self):
