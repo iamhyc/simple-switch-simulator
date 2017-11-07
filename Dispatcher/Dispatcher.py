@@ -1,4 +1,9 @@
 #! /usr/bin/python
+'''
+Dispatcher: for instruction manipulation
+@author: Mark Hong
+'''
+
 from time import sleep, ctime
 from multiprocessing import Process, Queue
 import socket, string, binascii
@@ -41,7 +46,6 @@ def add_client(cmd, addr):
 	proc_map[task_id].char = (wifi_ip, vlc_ip, port)
 	proc_map[task_id].queue = (p2c_q, fb_q)
 	proc_map[task_id]._thread = Distributor(
-									task_id,
 									proc_map[task_id].char, 
 									proc_map[task_id].queue
 								)
@@ -92,8 +96,6 @@ def main():
 
 if __name__ == '__main__':
 	ClientCount = 0
-	udp_wifi_port = 11112#self To port
-	udp_vlc_port = 11113#self To port
 	udp_tx_port = 11111#slef To port
 	udp_rx_port = 11112#From self port
 	proc_map = {}
