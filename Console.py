@@ -1,6 +1,5 @@
 
-import time
-import os
+import os, time
 from getpass import getuser
 import platform as pt
 import socket
@@ -54,7 +53,7 @@ def main():
 	_cls()
 	helper()
 	while True:
-		tipstr = localuser+"@Aggregator["+time.ctime()+"]> "
+		tipstr = localuser+"@Aggregator:["+time.ctime()+"]$ "
 		op, cmd = cmd_parse(raw_input(tipstr))
 
 		try:
