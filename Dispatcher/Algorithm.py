@@ -1,6 +1,7 @@
 #! /usr/bin/python
 from numpy import *
 from multiprocessing import Process, Queue
+from time import sleep
 
 class Algorithm(Process):
 	"""Non-Blocking running Algorithm Process
@@ -11,5 +12,8 @@ class Algorithm(Process):
 		self.fb_q, self.c2p_q = queue
 
 	def run(self):
+		while True:
+			sleep(1)
+			pass
 		pass
 		

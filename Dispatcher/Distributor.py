@@ -7,23 +7,48 @@ Dispatcher: for data flow manipulation
 from time import sleep, ctime
 from multiprocessing import Process, Queue
 import thread
-import socket, select
-import binascii
+import socket
+import binascii, struct
 
-class RatioCounter:
-	"""docstring for RatioCounter"""
-	def __init__(self, left, right):
-		self.left = left
-		self.right = right
+class QueueCoder:
+	"""docstring for QueueCoder"""
+	def __init__(self, tuple_q, ratio_list):
+		self.tuple_q = tuple(tuple_q)
+		self.splitter = list(ratio_list)
 		self.count = 0
 	
 	def setRatio(self, ratio):
 		#Ratio, Start, Stop, Switch
 		#need a <Counter Class> first
+		try:
+			self.splitter = [float(x) for x in ratio.split(',')]
+		except Exception as e:
+			pass
 		pass
 
-	def next():
-		pass
+	def put(self, raw):
+		raw_len = len(raw)
+		data_len = [round(x*raw_len) for x in self.splitter[:self.number]]
+		data_len.append(raw_len - sum(data_len)) #complementary last part
+
+		data = ['0'] * raw_len
+		data_ptr = 0
+		#firstly chop and add header
+		for x in xrange(self.number-1):
+			data[x] = (	struct.pack('I', self.count) +	# add header
+						struct.pack('B', x) + 			# add sub-header
+						raw[data_ptr:data_ptr+data_len[x]]
+			) 
+			
+			data_ptr += data_len[x]
+			pass
+		#then, straightly push into each split queue
+		for x in xrange(self.number):
+			if len(data[x]):
+				self.tuple_q[x].put_nowait(data[x])
+
+		self.count += 1
+		return True
 
 class Distributor(Process):
 	"""Non-Blocking running Distributor Process
@@ -34,7 +59,7 @@ class Distributor(Process):
 		@var queue:
 			multiprocess control side
 	"""
-	udp_src_port	= 12300
+	udp_src_port	= 10086
 	udp_wifi_port	= 11112 #self To port
 	udp_vlc_port	= 11113 #self To port
 
@@ -43,20 +68,22 @@ class Distributor(Process):
 		Process.__init__(self)
 		self.p2c_q, self.fb_q = queue
 		self.wifi_ip, self.vlc_ip, self.port = char
-		self.counter = RatioCounter()
 		self.ops_map = {
 			"set":self.setValue,
 			"ratio":self.counter.setRatio,
 		}
 		#2 Socket Init
-		self.setSource("static")
+		#self.setSource("static") #udp/file_p/static
 		self.__vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.__wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		#3 Socket Queue Init
-		self.source = "static" # udp/file_p/static
+		#3 Socket Queue Init 
 		self.buffer = Queue()
 		self.wifi_q = Queue()
 		self.vlc_q = Queue()
+		self.encoder = QueueCoder(
+			(self.wifi_q,	self.vlc_q),
+			(1.0,			0.0)
+		)
 		pass
 	
 	def cmd_parse(self, str):
@@ -120,9 +147,8 @@ class Distributor(Process):
 	def distXmitThread():
 		while True:
 			if not self.buffer.empty():
-				data = self.buffer.get_nowait()
-				header, q_id = self.counter.next()
-				q_id.put_nowait(header + data)
+				raw = self.buffer.get_nowait()
+				self.encoder.put(raw)
 				pass
 			sleep(0)#surrender turn
 			pass

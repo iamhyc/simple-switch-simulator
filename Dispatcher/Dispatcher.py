@@ -49,7 +49,7 @@ def add_client(cmd, addr):
 									proc_map[task_id].char, 
 									proc_map[task_id].queue
 								)
-	proc_map[task_id]._thread.daemon = True#set as daemon process
+	proc_map[task_id]._thread.daemon = True #set as daemon process
 	proc_map[task_id]._thread.start()
 
 	skt.sendto(str(port), (addr, udp_tx_port))
@@ -76,7 +76,8 @@ def _init():
 	fb_q = Queue()
 	c2p_q = Queue()
 	alg_node = Algorithm((fb_q, c2p_q))
-
+	alg_node.daemon = True #set as daemon process
+	alg_node.start()
 	pass
 
 def main():
