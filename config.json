@@ -1,0 +1,7 @@
+{
+	"udp_tx_port":11112,
+	"udp_rx_port":11111,
+	"udp_wifi_port":11112,
+	"udp_vlc_port":11113,
+	"udp_src_port":10086
+}
