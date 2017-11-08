@@ -15,6 +15,7 @@ class QueueCoder:
 	def __init__(self, tuple_q, ratio_list):
 		self.tuple_q = tuple(tuple_q)
 		self.splitter = list(ratio_list)
+		self.number = len(tuple_q)
 		self.count = 0
 	
 	def setRatio(self, ratio):
@@ -28,19 +29,26 @@ class QueueCoder:
 
 	def put(self, raw):
 		raw_len = len(raw)
-		data_len = [round(x*raw_len) for x in self.splitter[:self.number]]
+		data_len = [round(x*raw_len) for x in self.splitter[:self.number-1]]
 		data_len.append(raw_len - sum(data_len)) #complementary last part
 
-		data = ['0'] * raw_len
+		#init a empty list(NOT SAME REFERENCE!)
+		data = [''] * self.number 
 		data_ptr = 0
-		#firstly chop and add header
-		for x in xrange(self.number-1):
-			data[x] = (	struct.pack('I', self.count) +	# add header
-						struct.pack('B', x) + 			# add sub-header
-						raw[data_ptr:data_ptr+data_len[x]]
-			) 
-			
-			data_ptr += data_len[x]
+		#firstly chop and add Transport Header
+		#Seq[4B] + Size[2B] + Offset[2B] + Data
+		#Or: Tail_Flag[1b]|Seq[4B] + Order[1B] + Data
+		frame = struct.Struct('Ihhs') #Or, Struct('IBs')
+		for x in xrange(self.number):
+			if data_ptr < raw_len:
+				data[x] = frame.pack(
+							self.count,#Sequence number
+							raw_len,#total data size
+							data_ptr,#offset in subpacket
+							raw[data_ptr:data_ptr+data_len[x]]
+						)
+				data_ptr += data_len[x]
+				pass
 			pass
 		#then, straightly push into each split queue
 		for x in xrange(self.number):
