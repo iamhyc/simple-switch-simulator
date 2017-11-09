@@ -97,8 +97,8 @@ def main():
 
 if __name__ == '__main__':
 	ClientCount = 0
-	udp_tx_port = 11111#slef To port
-	udp_rx_port = 11112#From self port
+	udp_req_port = 11111#slef To port
+	udp_res_port = 11110#From self port
 	proc_map = {}
 	ops_map = {
 		"ls":process_print,

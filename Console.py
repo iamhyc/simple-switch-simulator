@@ -8,7 +8,7 @@ localuser = getuser()
 remote_cmdip = 'localhost'
 win_pt = "windows" in pt.platform().lower()
 
-global udp_tx_setup, udp_rx_setup
+global udp_req_setup, udp_res_setup
 
 def _cls():
 	if win_pt:
@@ -48,7 +48,7 @@ def main():
 	skt_cmd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_recv.settimeout(3.0)#3 seconds
-	skt_recv.bind(udp_rx_setup)
+	skt_recv.bind(udp_res_setup)
 
 	_cls()
 	helper()
@@ -58,7 +58,7 @@ def main():
 
 		try:
 			if op=='ls':
-				skt_cmd.sendto('ls', udp_tx_setup)
+				skt_cmd.sendto('ls', udp_res_setup)
 				data, ADDR = skt_recv.recvfrom(1024)
 				_cls()
 				print("%s\n"%(data))
@@ -67,13 +67,13 @@ def main():
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1>;<ip2>'
 				tmp = ('%s %s;%s'%("add", cmd[0], cmd[1]))
-				skt_cmd.sendto(tmp, udp_tx_setup)
+				skt_cmd.sendto(tmp, udp_req_setup)
 				print(tmp)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
 				tmp = ('%s %s'%("rm", cmd[0]))
-				skt_cmd.sendto(tmp, udp_tx_setup)
+				skt_cmd.sendto(tmp, udp_req_setup)
 				print(tmp)
 				pass
 			elif op=='sc' and len(cmd)>=1:
@@ -98,8 +98,8 @@ def main():
 	pass
 
 if __name__ == '__main__':
-	udp_tx_setup = ('localhost', 11112)
-	udp_rx_setup = (remote_cmdip, 11111)
+	udp_req_setup = ('localhost', 11110)
+	udp_res_setup = (remote_cmdip, 11111)
 
 	try:
 		main()
