@@ -1,4 +1,4 @@
-
+#! /usr/bin/python
 import os, time
 from getpass import getuser
 import platform as pt
