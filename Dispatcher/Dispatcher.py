@@ -3,7 +3,7 @@
 Dispatcher: for instruction manipulation
 @author: Mark Hong
 '''
-
+import json
 from time import sleep, ctime
 from multiprocessing import Process, Queue
 import socket, string, binascii
@@ -11,8 +11,7 @@ import socket, string, binascii
 from Distributor import Distributor
 from Algorithm import Algorithm
 
-global udp_wifi_port, udp_vlc_port
-global udp_tx_port, udp_rx_port
+global config
 global skt_res, skt_req
 global proc_map, ops_map
 global ClientCount
@@ -31,8 +30,8 @@ def cmd_parse(str):
 	pass
 
 def process_print(cmd, addr):
-	proc_list = '\n'.join( (item+' '+item.char) for item in proc_map)
-	skt.sendto(proc_list, (addr, udp_tx_port))
+	proc_list = ''.join( ('%s %s\n')%(item, item.char) for item in proc_map)
+	skt_res.sendto(proc_list, (addr, config['udp_client_port']))
 	pass
 
 def add_client(cmd, addr):
@@ -52,7 +51,7 @@ def add_client(cmd, addr):
 	proc_map[task_id]._thread.daemon = True #set as daemon process
 	proc_map[task_id]._thread.start()
 
-	skt.sendto(str(port), (addr, udp_tx_port))
+	skt_res.sendto(str(port), (addr, config['udp_client_port']))
 	ClientCount += 1
 	pass
 
@@ -65,13 +64,15 @@ def remove_client(cmd, addr):
 	proc_map[task_id]._thread.terminate() #forcely exit the server
 	del proc_map[task_id] # delete the item
 
-	skt.sendto('1', (addr, udp_tx_port))
+	skt_res.sendto('1', (addr, config['udp_client_port']))
 	pass
 
-def _init():
+def disp_init():
+	global skt_req, skt_res, fb_q, c2p_q, alg_node
+
 	skt_res = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_req = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_req.bind(('', udp_rx_port))
+	skt_req.bind(('', config['udp_server_port']))
 
 	fb_q = Queue()
 	c2p_q = Queue()
@@ -80,25 +81,31 @@ def _init():
 	alg_node.start()
 	pass
 
+def disp_exit():
+	alg_node.terminate()
+	exit()
+	pass
+
 def main():
-	_init()
+	disp_init()
 	while True:
 		data, addr = skt_req.recvfrom(1024)
 		op, cmd = cmd_parse(data)
 		try:
-			ops_map[op](cmd, addr)
+			ops_map[op](cmd, addr[0])
 		except Exception as e:
 			print('\nErrorCode: %s'%(e))
 			print('\"%s\" from %s'%(data, addr))
-			#skt.sendto(op+' Failed', (addr, udp_tx_port))
+			#skt_res.sendto(op+' Failed', (addr, config['udp_client_port']))
+			pass
 		pass
-	pass
 	pass
 
 if __name__ == '__main__':
+	with open('../config.json') as cf:
+		config = json.load(cf)
+
 	ClientCount = 0
-	udp_req_port = 11111#slef To port
-	udp_res_port = 11110#From self port
 	proc_map = {}
 	ops_map = {
 		"ls":process_print,
@@ -107,4 +114,10 @@ if __name__ == '__main__':
 	}
 
 	print("Dispatcher is now online...")
-	main()
+	try:
+		main()
+	except Exception as e:
+		raise e #for debug
+		pass
+	finally:
+		disp_exit()

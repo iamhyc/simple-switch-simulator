@@ -1,14 +1,13 @@
 #! /usr/bin/python
-import os, time
+import os, time, json
 from getpass import getuser
 import platform as pt
 import socket
 
-localuser = getuser()
-remote_cmdip = 'localhost'
-win_pt = "windows" in pt.platform().lower()
+global localuser, remote_cmdip
+global config
 
-global udp_req_setup, udp_res_setup
+win_pt = "windows" in pt.platform().lower()
 
 def _cls():
 	if win_pt:
@@ -18,7 +17,7 @@ def _cls():
 	pass
 
 def helper():
-	print("************************Controller Helper************************")
+	print("************************Console Helper************************")
 	print("                 [LS]    Current Client Process					")
 	print("                 [ADD]   Add a Client							")
 	print("                 [RM]    Remove a Client							")
@@ -48,7 +47,7 @@ def main():
 	skt_cmd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_recv.settimeout(3.0)#3 seconds
-	skt_recv.bind(udp_res_setup)
+	skt_recv.bind(('', config['udp_client_port']))
 
 	_cls()
 	helper()
@@ -58,7 +57,7 @@ def main():
 
 		try:
 			if op=='ls':
-				skt_cmd.sendto('ls', udp_res_setup)
+				skt_cmd.sendto('ls', (remote_cmdip, config['udp_server_port']))
 				data, ADDR = skt_recv.recvfrom(1024)
 				_cls()
 				print("%s\n"%(data))
@@ -66,14 +65,14 @@ def main():
 				pass
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1>;<ip2>'
-				tmp = ('%s %s;%s'%("add", cmd[0], cmd[1]))
-				skt_cmd.sendto(tmp, udp_req_setup)
+				tmp = ('%s %s;%s'%('add', cmd[0], cmd[1]))
+				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
 				print(tmp)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
 				tmp = ('%s %s'%("rm", cmd[0]))
-				skt_cmd.sendto(tmp, udp_req_setup)
+				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
 				print(tmp)
 				pass
 			elif op=='sc' and len(cmd)>=1:
@@ -93,13 +92,16 @@ def main():
 		except Exception as e:
 			#raise e ##for debug
 			print("...")
-
+			pass
 		pass
 	pass
 
 if __name__ == '__main__':
-	udp_req_setup = ('localhost', 11110)
-	udp_res_setup = (remote_cmdip, 11111)
+	with open('./config.json') as cf:
+		config = json.load(cf)
+
+	localuser = getuser()
+	remote_cmdip = 'localhost'
 
 	try:
 		main()

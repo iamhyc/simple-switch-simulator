@@ -12,8 +12,14 @@ class Algorithm(Process):
 		self.fb_q, self.c2p_q = queue
 
 	def run(self):
-		while True:
-			sleep(1)
+		try:
+			while True:
+				#print("hei,heihei")
+				sleep(1)
+				pass
+		except Exception as e:
+			#raise e #for debug
 			pass
-		pass
-		
+		finally:
+			print("<%s> now exit..."%("Algorithm node"))
+			exit()

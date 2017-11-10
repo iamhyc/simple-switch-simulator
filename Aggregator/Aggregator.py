@@ -3,14 +3,15 @@
 Aggregator: for data flow manipulation
 @author: Mark Hong
 '''
+import json
 import socket
 import binascii, struct
 from heapq import *
 from multiprocessing import Process, Queue, Lock
-import json
 from optparse import OptionParser
 
 global config, options
+global local_wifi_ip, local_vlc_proxy_ip, local_vlc_real_ip
 global req_skt, res_skt, fb_skt, fb_port
 global wifi_skt, vlc_skt, redist_skt
 global wifiProcHandle, vlcProcHandle, redistProcHandle
@@ -28,7 +29,7 @@ def redistProc(queue):
 
 def wifiRecvProc(lock):
 	wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	wifi_skt.bind(('', config.udp_wifi_port))
+	wifi_skt.bind(('', config['udp_wifi_port']))
 
 	while True:
 		raw, addr = wifi_skt.recvfrom(1024)
@@ -53,7 +54,7 @@ def wifiRecvProc(lock):
 
 def vlcRecvProc(lock):
 	vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	vlc_skt.bind(('', config.udp_vlc_port))
+	vlc_skt.bind(('', config['udp_vlc_port']))
 
 	while True:
 		raw, addr = vlc_skt.recvfrom(1024)
@@ -90,7 +91,9 @@ def recvStart():
 	vlcProcHandle.start()
 	pass
 
-def _init():
+def agg_init():
+	global ringBuffer, redist_q, redist_skt, req_skt, res_skt, fb_port, fb_skt
+
 	ringBuffer = [[-1, -1, []]] * sWindow
 	redist_q = Queue()
 
@@ -98,20 +101,20 @@ def _init():
 	req_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	res_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	res_skt.bind(('', config.udp_res_port))
+	res_skt.bind(('', config['udp_client_port']))
 
-	req_skt.send(init_cmd, (options.server, config.udp_req_port))
+	req_skt.send(init_cmd, (options.server, config['udp_server_port']))
 	fb_port, addr = res_skt.recvfrom(1024)#block until feedback
 	#assume no error here...hehe...
 	pass
 
-def _exit():
+def agg_exit():
 	#terminate process here
 	exit()
 	pass
 
 def main():
-	_init()
+	agg_init()
 	recvStart()
 
 	ptr = 0
@@ -131,6 +134,7 @@ if __name__ == '__main__':
 		config = json.load(cf)
 		pass
 
+	parser = OptionParser()
 	parser.add_option("-s", "--server",
 		dest="server", 
 		default="192.168.1.100", 
@@ -138,16 +142,17 @@ if __name__ == '__main__':
 	(options, args) = parser.parse_args()
 
 	frame_struct = struct.Struct('Ihhs') #Or, Struct('IBs')
-	init_cmd = ('%s %s;%s'%('add', local_wifi_ip, local_vlc_proxy_ip))
 	local_wifi_ip = "localhost"
 	local_vlc_proxy_ip = "localhost"
 	local_vlc_real_ip = "localhost"#bind to the relay ip
+	init_cmd = ('%s %s;%s'%('add', local_wifi_ip, local_vlc_proxy_ip))
 	sWindow = 500#config.sWindow
 	timeout = 100#config.timeout
 
 	try: #cope with Interrupt Signal
 		main()
 	except Exception as e:
-		#raise e
+		raise e #for debug
+		pass
 	finally:
-		_exit()
+		agg_exit()
