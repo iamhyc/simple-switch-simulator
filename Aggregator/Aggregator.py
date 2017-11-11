@@ -102,10 +102,15 @@ def agg_init():
 	#fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	res_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	res_skt.bind(('', config['udp_client_port']))
+	res_skt.settimeout(5)
 
-	req_skt.send(init_cmd, (options.server, config['udp_server_port']))
+	req_skt.sendto(init_cmd, (options.server, config['udp_server_port']))
 	fb_port, addr = res_skt.recvfrom(1024)#block until feedback
-	#assume no error here...hehe...
+	try:
+		#hope no error here...
+		fb_port = int(fb_port)
+	except Exception as e:
+		raise e
 	pass
 
 def agg_exit():
@@ -152,7 +157,7 @@ if __name__ == '__main__':
 	try: #cope with Interrupt Signal
 		main()
 	except Exception as e:
-		raise e #for debug
+		print(e) #for debug
 		pass
 	finally:
 		agg_exit()
