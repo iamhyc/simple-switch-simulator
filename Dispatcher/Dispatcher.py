@@ -30,11 +30,13 @@ def cmd_parse(str):
 	pass
 
 def process_print(cmd, addr):
-	proc_list = ''.join( ('%s %s\n')%(item, item.char) for item in proc_map)
+	proc_list = ''.join( ('%s %s\n')%(item, item['char']) for item in proc_map)
 	skt_res.sendto(proc_list, (addr, config['udp_client_port']))
 	pass
 
 def add_client(cmd, addr):
+	global ClientCount
+
 	wifi_ip, vlc_ip = cmd
 	task_id = ClientCount #allocate task_id
 	port = ALLOC_PORT_BASE + ClientCount #allocate port nubmer
@@ -42,17 +44,18 @@ def add_client(cmd, addr):
 	p2c_q = Queue() #Parent to Child Queue
 
 	proc_map[task_id] = {}
-	proc_map[task_id].char = (wifi_ip, vlc_ip, port)
-	proc_map[task_id].queue = (p2c_q, fb_q)
-	proc_map[task_id]._thread = Distributor(
-									proc_map[task_id].char, 
-									proc_map[task_id].queue
+	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
+	proc_map[task_id]['queue'] = (p2c_q, fb_q)
+	proc_map[task_id]['_thread'] = Distributor(
+									proc_map[task_id]['char'], 
+									proc_map[task_id]['queue']
 								)
-	proc_map[task_id]._thread.daemon = True #set as daemon process
-	proc_map[task_id]._thread.start()
+	proc_map[task_id]['_thread'].daemon = True #set as daemon process
+	proc_map[task_id]['_thread'].start()
 
 	skt_res.sendto(str(port), (addr, config['udp_client_port']))
 	ClientCount += 1
+	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 	pass
 
 def remove_client(cmd, addr):
@@ -61,19 +64,20 @@ def remove_client(cmd, addr):
 		raise Exception
 
 	#proc_map[task_id].join() # wait for itself exit
-	proc_map[task_id]._thread.terminate() #forcely exit the server
+	proc_map[task_id]['_thread'].terminate() #forcely exit the server
 	del proc_map[task_id] # delete the item
 
 	skt_res.sendto('1', (addr, config['udp_client_port']))
 	pass
 
 def disp_init():
-	global skt_req, skt_res, fb_q, c2p_q, alg_node
+	global skt_req, skt_res, fb_q, c2p_q, alg_node, ClientCount
 
 	skt_res = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_req = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_req.bind(('', config['udp_server_port']))
 
+	ClientCount = 0
 	fb_q = Queue()
 	c2p_q = Queue()
 	alg_node = Algorithm((fb_q, c2p_q))
@@ -89,6 +93,7 @@ def disp_exit():
 def main():
 	disp_init()
 	while True:
+		skt_req.settimeout(15) #for debug
 		data, addr = skt_req.recvfrom(1024)
 		op, cmd = cmd_parse(data)
 		try:
@@ -105,7 +110,6 @@ if __name__ == '__main__':
 	with open('../config.json') as cf:
 		config = json.load(cf)
 
-	ClientCount = 0
 	proc_map = {}
 	ops_map = {
 		"ls":process_print,

@@ -3,7 +3,7 @@
 Dispatcher: for data flow manipulation
 @author: Mark Hong
 '''
-
+import json
 from time import sleep, ctime
 from multiprocessing import Process, Queue
 import thread
@@ -67,6 +67,7 @@ class Distributor(Process):
 		@var queue:
 			multiprocess control side
 	"""
+	config = {}
 	udp_src_port	= 10086
 	udp_wifi_port	= 11112 #self To port
 	udp_vlc_port	= 11113 #self To port
@@ -75,11 +76,10 @@ class Distributor(Process):
 		#1 Internal Init
 		Process.__init__(self)
 		self.p2c_q, self.fb_q = queue
-		self.wifi_ip, self.vlc_ip, self.port = char
-		self.ops_map = {
-			"set":self.setValue,
-			"ratio":self.counter.setRatio,
-		}
+		self.wifi_ip, self.vlc_ip, self.fb_port = char
+		with open('../config.json') as cf:
+			config = json.load(cf)
+			pass
 		#2 Socket Init
 		#self.setSource("static") #udp/file_p/static
 		self.__vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -92,6 +92,11 @@ class Distributor(Process):
 			(self.wifi_q,	self.vlc_q),
 			(1.0,			0.0)
 		)
+		#4 Operation Map Driver
+		self.ops_map = {
+			"set":self.setValue,
+			"ratio":self.encoder.setRatio,
+		}
 		pass
 	
 	def cmd_parse(self, str):
@@ -128,7 +133,7 @@ class Distributor(Process):
 	def uplinkThread(self):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		fb_skt.setblocking(0) #Non-blocking Socket
-		fb_skt.bind(('', self.port)) #should bind to the wifi_ip
+		fb_skt.bind(('', self.fb_port)) #should bind to the wifi_ip
 
 		while True:
 			try:
@@ -142,7 +147,7 @@ class Distributor(Process):
 	def sourceThread(self, src):
 		src_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		src_skt.setblocking(0)
-		src_skt.bind(('', udp_src_port)) 
+		src_skt.bind(('', config['udp_src_port'])) 
 		while True:
 			try:
 				data = src_skt.recv(1024)
@@ -166,7 +171,7 @@ class Distributor(Process):
 		while True:
 			if not self.vlc_q.empty():
 				data = self.vlc_q.get_nowait()
-				__vlc_skt.sendto(data, (self.vlc_ip, udp_vlc_port))
+				__vlc_skt.sendto(data, (self.vlc_ip, config['udp_vlc_port']))
 				pass
 			sleep(0)#surrender turn
 		pass
@@ -175,7 +180,7 @@ class Distributor(Process):
 		while True:
 			if not self.wifi_q.empty():
 				data = self.wifi_q.get_nowait()
-				__wifi_skt.sendto(data, (self.wifi_ip, udp_wifi_port))
+				__wifi_skt.sendto(data, (self.wifi_ip, config['udp_wifi_port']))
 				pass
 			sleep(0)#surrender turn
 		pass
