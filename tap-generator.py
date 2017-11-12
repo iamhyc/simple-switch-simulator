@@ -25,7 +25,6 @@ if __name__ == '__main__':
 		pass
 
 	parser = OptionParser()
-	parser = OptionParser()
 	parser.add_option("-s", "--server",
 		dest="server",
 		type="string",

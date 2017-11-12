@@ -6,101 +6,107 @@ Aggregator: for data flow manipulation
 import json
 import socket
 import binascii, struct
-from multiprocessing import Process, Queue, Lock
+import Queue
+from threading import Thread, Lock
+from time import ctime, sleep
 from optparse import OptionParser
 
+global ringBuffer, rb_lock
 global config, options
-global local_wifi_ip, local_vlc_proxy_ip, local_vlc_real_ip
-global req_skt, res_skt, fb_skt, fb_port
-global wifi_skt, vlc_skt, redist_skt
-global wifiProcHandle, vlcProcHandle, redistProcHandle
-global frame_struct
-global ringBuffer, sWindow, timeout
-global redist_q
+global frame_struct, ringBuffer
+global fb_skt, fb_port, redist_skt, redist_q
+global wifiRecvHandle, vlcRecvHandle, redistHandle
 
-def redistProc(redist_q):
+def unpack_helper(fmt, data):
+    size = struct.calcsize(fmt)
+    return struct.unpack(fmt, data[:size]), data[size:]
+
+def redistThread(redist_q):
+	redist_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 	while True:
 		if not redist_q.empty():
 			data = redist_q.get_nowait()
-			redist_skt.snedto(data, ('localhost', 95533))#redistribution
+			print('Redistributed Data: %s'%(data))
+			redist_skt.sendto(data, ('localhost', 12306))#redistribution
+		sleep(0) #surrender turn
 		pass
 	pass
 
-def wifiRecvProc(lock, port):
-	global config
-
+def wifiRecvThread(config):
+	global ringBuffer
 	wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	wifi_skt.bind(('', port))
+	wifi_skt.bind(('', config['udp_wifi_port']))
 
 	while True:
 		raw, addr = wifi_skt.recvfrom(1024)
-		Seq, Size, Offset, Data = frame_struct.unpack(raw)
+		(Seq, Size, Offset), Data = unpack_helper(config['frame_struct'], raw)
+		print('From Wi-Fi link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
 
-		ptr = Seq % sWindow
+		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with lock:
+			with rb_lock:
 				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
 				ringBuffer[ptr][2][Offset:Offset+Size] = Data
 			pass
 		else:
-			with lock:
+			with rb_lock:
 				ringBuffer[ptr][1] -= len(Data)
 				ringBuffer[ptr][2][Offset:Offset+Size] = Data
 			pass
 		#statistical collection here
     	#print(os.getpid())
-    		pass
-		pass
+    	sleep(0) #surrender turn
 	pass
 
-def vlcRecvProc(lock, port):
-	global config
-
+def vlcRecvThread(config):
+	global ringBuffer
 	vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	vlc_skt.bind(('', port))
+	vlc_skt.bind(('', config['udp_vlc_port']))
 
 	while True:
 		raw, addr = vlc_skt.recvfrom(1024)
-		Seq, Size, Offset, Data = frame_struct.unpack(raw)
+		(Seq, Size, Offset), Data = unpack_helper(config['frame_struct'], raw)
+		print('From VLC link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
 		
-		ptr = Seq % sWindow
+		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with lock:
+			with rb_lock:
 				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
 				ringBuffer[ptr][2][Offset:Offset+Size] = Data
 			pass
 		else:
-			with lock:
+			with rb_lock:
 				ringBuffer[ptr][1] -= len(Data)
 				ringBuffer[ptr][2][Offset:Offset+Size] = Data
 			pass
 		#statistical collection here
     	#print(os.getpid())
-    		pass
-		pass
+    	sleep(0) #surrender turn
 	pass
 
 def recvStart():
-	lock = Lock()
+	global ringBuffer, rb_lock, config
+	
+	rb_lock = Lock()
+	wifiRecvHandle = Thread(target=wifiRecvThread, args=(config, ))
+	vlcRecvHandle = Thread(target=vlcRecvThread, args=(config, ))
+	redistHandle = Thread(target=redistThread, args=(redist_q, ))
+	wifiRecvHandle.setDaemon(True)
+	vlcRecvHandle.setDaemon(True)
+	redistHandle.setDaemon(True)
 
-	wifiProcHandle = Process(target=wifiRecvProc,args=(lock, config['udp_wifi_port']))
-	vlcProcHandle = Process(target=vlcRecvProc,args=(lock, config['udp_vlc_port']))
-	redistProcHandle = Process(target=redistProc,args=(redist_q,))
-	wifiProcHandle.daemon = True
-	vlcProcHandle.daemon = True
-	redistProcHandle.daemon = True
-	redistProcHandle.start()
-	wifiProcHandle.start()
-	vlcProcHandle.start()
+	redistHandle.start()
+	wifiRecvHandle.start()
+	vlcRecvHandle.start()
 	pass
 
 def agg_init():
-	global ringBuffer, redist_q, redist_skt, req_skt, res_skt, fb_port, fb_skt
+	global config, ringBuffer, redist_q, fb_port, fb_skt
 
-	ringBuffer = [[-1, -1, []]] * sWindow
-	redist_q = Queue()
-
-	redist_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	ringBuffer = ([[-1, -1, []]] * config['sWindow'])
+	redist_q = Queue.Queue()
+	
 	req_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	res_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -126,17 +132,25 @@ def main():
 	agg_init()
 	recvStart()
 
-	ptr = 0
+	cnt = 0
 	while True:
-		if ringBuffer[ptr][0] > ptr:
+		ptr = (cnt % config['sWindow'])
+		if ringBuffer[ptr][0]  == cnt: #assume: writing not over reading
 			counter = 0
-			while ringBuffer[ptr][1]!= 0 and counter < timeout:
-				counter += counter
-			if counter >= timeout:
-				redist_q.put_nowait(''.join(ringBuffer[ptr][3]))
+			while ringBuffer[ptr][1]!= 0 and counter < config['timeout']:
+				counter += 1
+
+			if counter <= config['timeout']:
+				redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+				pass
+
+			cnt += 1
+			print(cnt)
 			pass
+		sleep(0) #surrender turn
 		pass
 	pass
+
 
 if __name__ == '__main__':
 	with open('../config.json') as cf:
@@ -155,8 +169,6 @@ if __name__ == '__main__':
 	local_vlc_proxy_ip = "localhost"
 	local_vlc_real_ip = "localhost"#bind to the relay ip
 	init_cmd = ('%s %s;%s'%('add', local_wifi_ip, local_vlc_proxy_ip))
-	sWindow = 500#config.sWindow
-	timeout = 100#config.timeout
 
 	try: #cope with Interrupt Signal
 		main()

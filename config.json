@@ -5,6 +5,7 @@
 	"udp_vlc_port":11113,
 	"udp_src_port":10086,
 
-	"sWindow":500,
-	"timeout":100
+	"frame_struct":"Ihh",
+	"sWindow":100,
+	"timeout":4000
 }

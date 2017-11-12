@@ -55,8 +55,9 @@ def add_client(cmd, addr):
 	proc_map[task_id]['_thread'].start()
 
 	skt_res.sendto(str(port), (addr, config['udp_client_port']))
-	ClientCount += 1
 	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
+
+	ClientCount += 1
 	pass
 
 def remove_client(cmd, addr):
