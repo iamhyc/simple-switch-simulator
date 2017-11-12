@@ -47,6 +47,7 @@ def add_client(cmd, addr):
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
 	proc_map[task_id]['queue'] = (p2c_q, fb_q)
 	proc_map[task_id]['_thread'] = Distributor(
+									task_id,
 									proc_map[task_id]['char'], 
 									proc_map[task_id]['queue']
 								)

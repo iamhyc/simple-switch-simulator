@@ -6,7 +6,6 @@ Aggregator: for data flow manipulation
 import json
 import socket
 import binascii, struct
-from heapq import *
 from multiprocessing import Process, Queue, Lock
 from optparse import OptionParser
 
@@ -19,7 +18,7 @@ global frame_struct
 global ringBuffer, sWindow, timeout
 global redist_q
 
-def redistProc(queue):
+def redistProc(redist_q):
 	while True:
 		if not redist_q.empty():
 			data = redist_q.get_nowait()
@@ -27,9 +26,11 @@ def redistProc(queue):
 		pass
 	pass
 
-def wifiRecvProc(lock):
+def wifiRecvProc(lock, port):
+	global config
+
 	wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	wifi_skt.bind(('', config['udp_wifi_port']))
+	wifi_skt.bind(('', port))
 
 	while True:
 		raw, addr = wifi_skt.recvfrom(1024)
@@ -52,9 +53,11 @@ def wifiRecvProc(lock):
 		pass
 	pass
 
-def vlcRecvProc(lock):
+def vlcRecvProc(lock, port):
+	global config
+
 	vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	vlc_skt.bind(('', config['udp_vlc_port']))
+	vlc_skt.bind(('', port))
 
 	while True:
 		raw, addr = vlc_skt.recvfrom(1024)
@@ -78,11 +81,11 @@ def vlcRecvProc(lock):
 	pass
 
 def recvStart():
-	lock = multiprocessing.Lock()
+	lock = Lock()
 
-	wifiProcHandle = multiprocessing.Process(target=wifiRecvProc,args=(lock,))
-	vlcProcHandle = multiprocessing.Process(target=vlcRecvProc,args=(lock,))
-	redistProcHandle = multiprocessing.Process(target=redistProc,args=(redist_q,))
+	wifiProcHandle = Process(target=wifiRecvProc,args=(lock, config['udp_wifi_port']))
+	vlcProcHandle = Process(target=vlcRecvProc,args=(lock, config['udp_vlc_port']))
+	redistProcHandle = Process(target=redistProc,args=(redist_q,))
 	wifiProcHandle.daemon = True
 	vlcProcHandle.daemon = True
 	redistProcHandle.daemon = True
@@ -109,6 +112,7 @@ def agg_init():
 	try:
 		#hope no error here...
 		fb_port = int(fb_port)
+		print('Connected with uplink port %d.'%(fb_port))
 	except Exception as e:
 		raise e
 	pass
@@ -142,8 +146,8 @@ if __name__ == '__main__':
 	parser = OptionParser()
 	parser.add_option("-s", "--server",
 		dest="server", 
-		default="192.168.1.100", 
-		help="Designate the distributor server") 
+		default="localhost", 
+		help="Designate the dispatcher server") 
 	(options, args) = parser.parse_args()
 
 	frame_struct = struct.Struct('Ihhs') #Or, Struct('IBs')
