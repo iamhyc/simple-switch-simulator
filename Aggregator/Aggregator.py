@@ -27,7 +27,7 @@ def redistThread(redist_q):
 	while True:
 		if not redist_q.empty():
 			data = redist_q.get_nowait()
-			print('Redistributed Data: %s'%(data))
+			#print('Redistributed Data: %s'%(data))
 			redist_skt.sendto(data, ('localhost', 12306))#redistribution
 		sleep(0) #surrender turn
 		pass
@@ -39,9 +39,9 @@ def wifiRecvThread(config):
 	wifi_skt.bind(('', config['udp_wifi_port']))
 
 	while True:
-		raw, addr = wifi_skt.recvfrom(1024)
+		raw, addr = wifi_skt.recvfrom(4096)
 		(Seq, Size, Offset), Data = unpack_helper(config['frame_struct'], raw)
-		print('From Wi-Fi link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
+		#print('From Wi-Fi link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
 
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
@@ -65,9 +65,9 @@ def vlcRecvThread(config):
 	vlc_skt.bind(('', config['udp_vlc_port']))
 
 	while True:
-		raw, addr = vlc_skt.recvfrom(1024)
+		raw, addr = vlc_skt.recvfrom(4096)
 		(Seq, Size, Offset), Data = unpack_helper(config['frame_struct'], raw)
-		print('From VLC link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
+		#print('From VLC link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
 		
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:

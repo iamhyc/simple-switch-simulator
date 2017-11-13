@@ -55,6 +55,7 @@ class QueueCoder:
 				self.tuple_q[x].put_nowait(data[x])
 
 		self.count += 1
+		print(self.count)
 		return True
 
 class Distributor(Process):
@@ -90,7 +91,7 @@ class Distributor(Process):
 		self.vlc_q = Queue()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
-			(0.5,			0.5)
+			(1.0,			0.0)
 		)
 		#4 Operation Map Driver
 		self.ops_map = {
@@ -152,9 +153,9 @@ class Distributor(Process):
 		src_skt.bind(('', port)) 
 		while True:
 			try:
-				data = src_skt.recv(1024)
+				data = src_skt.recv(4096)
 				self.buffer.put_nowait(data)
-				print('Source Data: %s'%(data))
+				#print('Source Data: %s'%(data))
 			except Exception as e:
 				pass
 			sleep(0)#surrender turn
@@ -176,7 +177,7 @@ class Distributor(Process):
 		while True:
 			if not self.vlc_q.empty():
 				data = self.vlc_q.get_nowait()
-				print('To VLC link: %s'%(data))
+				#print('To VLC link: %s'%(data))
 				self.__vlc_skt.sendto(data, (self.vlc_ip, port))
 				pass
 			sleep(0)#surrender turn
@@ -188,7 +189,7 @@ class Distributor(Process):
 		while True:
 			if not self.wifi_q.empty():
 				data = self.wifi_q.get_nowait()
-				print('To Wi-Fi link: %s'%(data))
+				#print('To Wi-Fi link: %s'%(data))
 				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
 				pass
 			sleep(0)#surrender turn

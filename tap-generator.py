@@ -14,7 +14,8 @@ def main():
 	while True:
 		raw_input('Tap to continue...')
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in range(options.len))
-		skt.sendto(data, (options.server, config['udp_src_port']))
+		for x in xrange(options.number):
+			skt.sendto(data, (options.server, config['udp_src_port']))
 		print(data)
 		pass
 	pass
@@ -34,6 +35,11 @@ if __name__ == '__main__':
 		dest="len",
 		type="int",
 		default=256, 
+		help="Designate the distributor server")
+	parser.add_option("-n", "--number",
+		dest="number",
+		type="int",
+		default=1, 
 		help="Designate the distributor server")
 	(options, args) = parser.parse_args()
 

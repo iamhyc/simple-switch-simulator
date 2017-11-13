@@ -95,7 +95,7 @@ def disp_exit():
 def main():
 	disp_init()
 	while True:
-		skt_req.settimeout(15) #for debug
+		#skt_req.settimeout(15) #for debug
 		data, addr = skt_req.recvfrom(1024)
 		op, cmd = cmd_parse(data)
 		try:
