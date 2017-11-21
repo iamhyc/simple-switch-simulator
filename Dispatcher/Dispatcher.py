@@ -30,7 +30,7 @@ def cmd_parse(str):
 	pass
 
 def process_print(cmd, addr):
-	proc_list = ''.join( ('%s %s\n')%(item, item['char']) for item in proc_map)
+	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
 	skt_res.sendto(proc_list, (addr, config['udp_client_port']))
 	pass
 
