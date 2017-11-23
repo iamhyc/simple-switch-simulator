@@ -51,8 +51,8 @@ def wifiRecvThread(config):
 			pass
 		else:
 			with rb_lock:
-				ringBuffer[ptr][1] -= len(Data)
 				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+				ringBuffer[ptr][1] -= len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -77,8 +77,8 @@ def vlcRecvThread(config):
 			pass
 		else:
 			with rb_lock:
-				ringBuffer[ptr][1] -= len(Data)
 				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+				ringBuffer[ptr][1] -= len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
