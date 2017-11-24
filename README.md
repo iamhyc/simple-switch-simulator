@@ -10,12 +10,12 @@ Simple link switch or aggregation simulator. And a cache node controller based o
 
 (should disattach *data source* from **Distributor** to the control of **Dispatcher**)
 
-|        SERVER SIDE        |     FILES      |          CACHE SIDE          |     FILES     |
-| :-----------------------: | :------------: | :--------------------------: | :-----------: |
-| **Content Publish Layer** |  Publisher.py  | **Content Publish subLayer** |   Proxy.py    |
-|   **Convergence Layer**   | Dispatcher.py  |                              |               |
-|      **Data Layer**       | Distributor.py |        **Data Layer**        | Aggregator.py |
-|                           |                |                              |               |
+|        SERVER SIDE        |     FILES      |       CACHE SIDE        |     FILES     |
+| :-----------------------: | :------------: | :---------------------: | :-----------: |
+| **Content Publish Layer** |  Publisher.py  | **Content Proxy Layer** |   Proxy.py    |
+|   **Convergence Layer**   | Dispatcher.py  |                         |               |
+|    **Data Flow Layer**    | Distributor.py |   **Data Flow Layer**   | Aggregator.py |
+|                           |                |                         |               |
 
 ## Frontend Structure
 
