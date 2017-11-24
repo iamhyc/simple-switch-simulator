@@ -1,6 +1,8 @@
 #! /usr/bin/python
 '''
-Dispatcher: for data flow manipulation
+Dispatcher: 
+	[Data Layer] for data flow manipulation
+	data source control shifts to Dispatcher.py
 @author: Mark Hong
 '''
 import json

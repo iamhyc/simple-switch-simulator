@@ -1,6 +1,8 @@
 #! /usr/bin/python
 '''
-Dispatcher: for instruction manipulation
+Dispatcher: 
+	[convergence layer] for instruction manipulation
+	accept from: Console.py, Publisher.py, Algorithm, Aggregator.py
 @author: Mark Hong
 '''
 import json

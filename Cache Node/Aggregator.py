@@ -1,6 +1,8 @@
 #! /usr/bin/python
 '''
-Aggregator: for data flow manipulation
+Aggregator: 
+	[Data Layer] for data flow manipulation
+	redistribute data for persistence under [Proxy Layer]
 @author: Mark Hong
 '''
 import json

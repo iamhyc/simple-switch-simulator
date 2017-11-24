@@ -96,7 +96,7 @@ def main():
 	pass
 
 if __name__ == '__main__':
-	with open('./config.json') as cf:
+	with open('../config.json') as cf:
 		config = json.load(cf)
 
 	localuser = getuser()
