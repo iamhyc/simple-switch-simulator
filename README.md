@@ -21,12 +21,18 @@ Simple link switch or aggregation simulator. And a cache node controller based o
 
 **Client** registers at **Publisher**.
 
-|     SCHEMA     |        REQUEST        |               RESPONSE                |
-| :------------: | :-------------------: | :-----------------------------------: |
-|  Dual-Request  | at most twice/content | lack of popular statistical  feedback |
-| Request-Proxy  |     once/content      |     lack of cache uplink control      |
-| Request-Redist |     once/content      |      overhead if request redist       |
-|                |                       |                                       |
+|     SCHEMA     |         REQUEST         |                 RESPONSE                 |        TRAITS         |
+| :------------: | :---------------------: | :--------------------------------------: | :-------------------: |
+| `Dual-Request` | `at most twice/content` | `lack of popular statistical  feedback; dual control` |   `lower overhead`    |
+| Request-Proxy  |      once/content       | lack of cache uplink control; statistical feedback proxy | lower overhead if hit |
+| Request-Redist |      once/content       |        overhead if request redist        |        Normal         |
+|                |                         |                                          |                       |
+
+## Remained Problem
+
+* Client上行 和 Cache上行，都依赖Wi-Fi链路
+* Cache节点的proxy需要接受上层的下行控制
+* Client是否需要两条上行链路？不需要。
 
 ## TODO
 
