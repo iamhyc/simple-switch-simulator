@@ -11,11 +11,13 @@ from threading import Thread, Lock
 from time import ctime, sleep, time
 from optparse import OptionParser
 
-global ringBuffer, rb_lock
+global ringBuffer
 global config, options
 global frame_struct, ringBuffer
 global fb_skt, fb_port, redist_skt, redist_q
 global wifiRecvHandle, vlcRecvHandle, redistHandle
+
+mutex = Lock()
 
 def unpack_helper(fmt, data):
     size = struct.calcsize(fmt)
@@ -45,15 +47,16 @@ def wifiRecvThread(config):
 
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with rb_lock:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			mutex.acquire()
+			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+			ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			mutex.release()
 			pass
 		else:
-			with rb_lock:
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
-				ringBuffer[ptr][1] -= len(Data)
-			pass
+			mutex.acquire()
+			ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			ringBuffer[ptr][1] -= len(Data)
+			mutex.release()
 		#statistical collection here
     	#print(os.getpid())
     	sleep(0) #surrender turn
@@ -71,14 +74,16 @@ def vlcRecvThread(config):
 		
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with rb_lock:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			mutex.acquire()
+			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+			ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			mutex.release()
 			pass
 		else:
-			with rb_lock:
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
-				ringBuffer[ptr][1] -= len(Data)
+			mutex.acquire()
+			ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			ringBuffer[ptr][1] -= len(Data)
+			mutex.release()
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -86,9 +91,8 @@ def vlcRecvThread(config):
 	pass
 
 def recvStart():
-	global ringBuffer, rb_lock, config
+	global ringBuffer, config
 	
-	rb_lock = Lock()
 	wifiRecvHandle = Thread(target=wifiRecvThread, args=(config, ))
 	vlcRecvHandle = Thread(target=vlcRecvThread, args=(config, ))
 	redistHandle = Thread(target=redistThread, args=(redist_q, ))
@@ -147,7 +151,9 @@ def main():
 				sub_verified = False
 				while time()-timeout < config['Btimeout']:
 					if ringBuffer[ptr][1] == 0:
+						mutex.acquire()
 						redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+						mutex.release()
 						sub_verified = True
 						break
 					pass
