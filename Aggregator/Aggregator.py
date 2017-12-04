@@ -139,47 +139,36 @@ def main():
 	cnt, ptr = 0, 0
 	timeout = time() # packet time counter
 	while True:
+		ptr = (cnt % config['sWindow'])
 		if time()-timeout < config['Atimeout']:
 			if ringBuffer[ptr][0] == cnt: #assume: writing not over reading
 				timeout = time() # subpacket time counter
-				while ringBuffer[ptr][1] != 0 and time()-timeout < config['Btimeout']:
-					pass
-				
-				if timeout <= config['Btimeout']:
-					redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+
+				sub_verified = False
+				while time()-timeout < config['Btimeout']:
+					if ringBuffer[ptr][1] == 0:
+						redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+						sub_verified = True
+						break
 					pass
 
 				timeout = time() # reset subpacket time counter
 				cnt += 1
 				ptr = (cnt % config['sWindow'])
-				print(cnt)
+				if sub_verified:
+					print(cnt)
+				else:
+					print("subPacket loss in %d."%(cnt))
 				pass
 			pass
 		else: # packet loss
 			timeout = time() # reset packet time counter
 			cnt += 1
 			ptr = (cnt % config['sWindow'])
-			print("Packet %d loss.\n"%(cnt))
+			print("Packet %d loss."%(cnt))
 			pass
 		pass
 	pass
-	# while True:
-	# 	ptr = (cnt % config['sWindow'])
-	# 	if ringBuffer[ptr][0]  == cnt: #assume: writing not over reading
-	# 		counter = 0
-	# 		while ringBuffer[ptr][1]!= 0 and counter < config['timeout']:
-	# 			counter += 1
-
-	# 		if counter <= config['timeout']:
-	# 			redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
-	# 			pass
-
-	# 		cnt += 1
-	# 		print(cnt)
-	# 		pass
-	# 	sleep(0) #surrender turn
-	# 	pass
-	# pass
 
 
 if __name__ == '__main__':
