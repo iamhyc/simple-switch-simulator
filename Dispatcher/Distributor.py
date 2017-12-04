@@ -105,7 +105,7 @@ class Distributor(Process):
 		op_tuple = str.lower().split(' ', 1)
 		op = op_tuple[0]
 		if len(op_tuple) > 1:
-			cmd = op_tuple[1]
+			cmd = op_tuple[1:]
 			pass
 		return op, cmd
 

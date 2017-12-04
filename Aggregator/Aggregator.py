@@ -180,14 +180,19 @@ if __name__ == '__main__':
 	parser.add_option("-s", "--server",
 		dest="server", 
 		default="localhost", 
-		help="Designate the dispatcher server") 
+		help="Designate the dispatcher server")
+	parser.add_option("-w", "--wifi",
+		dest="wifi", 
+		default="localhost", 
+		help="Designate the Wi-Fi interface")
+	parser.add_option("-v", "--vlc",
+		dest="vlc", 
+		default="localhost", 
+		help="Designate the VLC interface")
 	(options, args) = parser.parse_args()
 
 	frame_struct = struct.Struct('Ihhs') #Or, Struct('IBs')
-	local_wifi_ip = "localhost"
-	local_vlc_proxy_ip = "localhost"
-	local_vlc_real_ip = "localhost"#bind to the relay ip
-	init_cmd = ('%s %s;%s'%('add', local_wifi_ip, local_vlc_proxy_ip))
+	init_cmd = ('%s %s %s'%('add', options.wifi, options.vlc))
 
 	try: #cope with Interrupt Signal
 		main()

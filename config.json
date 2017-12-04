@@ -8,5 +8,5 @@
 	"frame_struct":"Ihh",
 	"sWindow":1000,
 	"Atimeout":0.30,
-	"Btimeout":0.08
+	"Btimeout":0.10
 }
