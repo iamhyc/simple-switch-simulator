@@ -1,5 +1,4 @@
 #! /usr/bin/python
-from numpy import *
 from multiprocessing import Process, Queue
 from time import sleep
 

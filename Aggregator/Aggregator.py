@@ -8,7 +8,7 @@ import socket
 import binascii, struct
 import Queue
 from threading import Thread, Lock
-from time import ctime, sleep
+from time import ctime, sleep, time
 from optparse import OptionParser
 
 global ringBuffer, rb_lock
@@ -131,25 +131,55 @@ def agg_exit():
 def main():
 	agg_init()
 	recvStart()
+	
+	while ringBuffer[0][0] != 0:
+		sleep(0.1) # wait
+		pass
 
-	cnt = 0
+	cnt, ptr = 0, 0
+	timeout = time() # packet time counter
 	while True:
-		ptr = (cnt % config['sWindow'])
-		if ringBuffer[ptr][0]  == cnt: #assume: writing not over reading
-			counter = 0
-			while ringBuffer[ptr][1]!= 0 and counter < config['timeout']:
-				counter += 1
+		if time()-timeout < config['Atimeout']:
+			if ringBuffer[ptr][0] == cnt: #assume: writing not over reading
+				timeout = time() # subpacket time counter
+				while ringBuffer[ptr][1] != 0 and time()-timeout < config['Btimeout']:
+					pass
+				
+				if timeout <= config['Btimeout']:
+					redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+					pass
 
-			if counter <= config['timeout']:
-				redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+				timeout = time() # reset subpacket time counter
+				cnt += 1
+				ptr = (cnt % config['sWindow'])
+				print(cnt)
 				pass
-
-			cnt += 1
-			print(cnt)
 			pass
-		sleep(0) #surrender turn
+		else: # packet loss
+			timeout = time() # reset packet time counter
+			cnt += 1
+			ptr = (cnt % config['sWindow'])
+			print("Packet %d loss.\n"%(cnt))
+			pass
 		pass
 	pass
+	# while True:
+	# 	ptr = (cnt % config['sWindow'])
+	# 	if ringBuffer[ptr][0]  == cnt: #assume: writing not over reading
+	# 		counter = 0
+	# 		while ringBuffer[ptr][1]!= 0 and counter < config['timeout']:
+	# 			counter += 1
+
+	# 		if counter <= config['timeout']:
+	# 			redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+	# 			pass
+
+	# 		cnt += 1
+	# 		print(cnt)
+	# 		pass
+	# 	sleep(0) #surrender turn
+	# 	pass
+	# pass
 
 
 if __name__ == '__main__':
