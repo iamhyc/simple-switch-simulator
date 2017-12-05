@@ -161,13 +161,14 @@ class Distributor(Process):
 
 	def sourceThread(self, port):
 		src_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		src_skt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
 		src_skt.setblocking(0)
 		src_skt.bind(('', port)) 
 		while True:
 			try:
 				data = src_skt.recv(4096)
 				self.buffer.put_nowait(data)
-				#print('Source Data: %s'%(data))
+				#print('Source Data: %s'%(data)) #for debug
 			except Exception as e:
 				pass
 			sleep(0)#surrender turn
