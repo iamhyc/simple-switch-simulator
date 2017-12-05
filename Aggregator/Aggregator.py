@@ -99,7 +99,11 @@ def recvStart():
 def agg_init():
 	global config, ringBuffer, redist_q, fb_port, fb_skt
 
-	ringBuffer = ([[-1, -1, []]] * config['sWindow'])
+	# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
+	ringBuffer = [0] * config['sWindow']
+	for x in xrange(config['sWindow']):
+		ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
+		pass
 	redist_q = Queue.Queue()
 	
 	req_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
