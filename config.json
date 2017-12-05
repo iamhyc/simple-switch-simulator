@@ -6,6 +6,7 @@
 	"udp_src_port":10086,
 
 	"frame_struct":"Ihh",
-	"sWindow":100,
-	"timeout":4000
+	"sWindow":1000,
+	"Atimeout":0.30,
+	"Btimeout":0.10
 }
