@@ -67,9 +67,6 @@ class Distributor(Process):
 		@var queue:
 			multiprocess control side
 	"""
-	udp_src_port	= 10086
-	udp_wifi_port	= 11112 #self To port
-	udp_vlc_port	= 11113 #self To port
 
 	def __init__(self, task_id, char, queue):
 		#1 Internal Init
@@ -120,7 +117,7 @@ class Distributor(Process):
 		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
 		#init transmission link --> idle
 		thread.start_new_thread(self.distXmitThread,())
-		thread.start_new_thread(self.vlcXmitThread, (self.config['udp_vlc_port'], ))
+		thread.start_new_thread(self.vlcXmitThread, (self.config['udp_vlc_port_tx'], ))
 		thread.start_new_thread(self.wifiXmitThread, (self.config['udp_wifi_port'], ))
 		#init data source --> busy
 		thread.start_new_thread(self.sourceThread, (self.config['udp_src_port'], ))

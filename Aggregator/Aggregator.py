@@ -60,7 +60,7 @@ def wifiRecvThread(config):
 def vlcRecvThread(config):
 	global ringBuffer
 	vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	vlc_skt.bind(('', config['udp_vlc_port']))
+	vlc_skt.bind(('', config['udp_vlc_port_rx']))
 
 	while True:
 		raw, addr = vlc_skt.recvfrom(4096)
