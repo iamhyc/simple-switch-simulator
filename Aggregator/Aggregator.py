@@ -33,40 +33,16 @@ def redistThread(redist_q):
 		pass
 	pass
 
-def wifiRecvThread(config):
+def RecvThread(name, port, config):
 	global ringBuffer
-	wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	wifi_skt.bind(('', config['udp_wifi_port']))
+	recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	recv_skt.bind(('', port))
 
 	while True:
-		raw, addr = wifi_skt.recvfrom(4096)
-		(Seq, Size, Offset), Data = unpack_helper(config['frame_struct'], raw)
-		#print('From Wi-Fi link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
+		raw, addr = recv_skt.recvfrom(4096)
+		(Seq, Size, Offset, CRC), Data = unpack_helper(config['struct'], raw)
+		#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
 
-		ptr = Seq % config['sWindow']
-		if ringBuffer[ptr][0] != Seq:
-			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
-			pass
-		else:
-			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
-			ringBuffer[ptr][1] -= len(Data)
-			pass
-		#statistical collection here
-    	#print(os.getpid())
-    	sleep(0) #surrender turn
-	pass
-
-def vlcRecvThread(config):
-	global ringBuffer
-	vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	vlc_skt.bind(('', config['udp_vlc_port_rx']))
-
-	while True:
-		raw, addr = vlc_skt.recvfrom(4096)
-		(Seq, Size, Offset), Data = unpack_helper(config['frame_struct'], raw)
-		#print('From VLC link:(%d,%d,%d,%s)'%(Seq, Size, Offset, Data)) #for debug
-		
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
 			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
@@ -84,8 +60,8 @@ def vlcRecvThread(config):
 def recvStart():
 	global ringBuffer, config
 	
-	wifiRecvHandle = Thread(target=wifiRecvThread, args=(config, ))
-	vlcRecvHandle = Thread(target=vlcRecvThread, args=(config, ))
+	wifiRecvHandle = Thread(target=RecvThread, args=('Wi-Fi', config['udp_wifi_port'], config))
+	vlcRecvHandle = Thread(target=RecvThread, args=('VLC', config['udp_vlc_port_rx'], config))
 	redistHandle = Thread(target=redistThread, args=(redist_q, ))
 	wifiRecvHandle.setDaemon(True)
 	vlcRecvHandle.setDaemon(True)
@@ -190,7 +166,7 @@ if __name__ == '__main__':
 		help="Designate the VLC interface")
 	(options, args) = parser.parse_args()
 
-	frame_struct = struct.Struct('Ihhs') #Or, Struct('IBs')
+	frame_struct = struct.Struct('IHH') #Or, Struct('IB')
 	init_cmd = ('%s %s %s'%('add', options.wifi, options.vlc))
 
 	try: #cope with Interrupt Signal

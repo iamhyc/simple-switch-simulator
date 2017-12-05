@@ -3,11 +3,11 @@
 	"udp_client_port":11111,
 	"udp_wifi_port":11112,
 	"udp_vlc_port_rx":11113,
-	"udp_vlc_port_tx":12345,
+	"udp_vlc_port_tx":11113,
 	"udp_src_port":10086,
 	"udp_redist_port":12306,
 
-	"frame_struct":"Ihh",
+	"struct":"IHHH",
 	"sWindow":1000,
 	"Atimeout":0.30,
 	"Btimeout":0.10
