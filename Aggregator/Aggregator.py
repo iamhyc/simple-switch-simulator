@@ -7,11 +7,11 @@ import json
 import socket
 import binascii, struct
 import Queue
-from threading import Thread, Lock
+from threading import Thread
 from time import ctime, sleep, time
 from optparse import OptionParser
 
-global ringBuffer, rb_lock
+global ringBuffer
 global config, options
 global frame_struct, ringBuffer
 global fb_skt, fb_port, redist_skt, redist_q
@@ -45,14 +45,12 @@ def wifiRecvThread(config):
 
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with rb_lock:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
 			pass
 		else:
-			with rb_lock:
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
-				ringBuffer[ptr][1] -= len(Data)
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+			ringBuffer[ptr][1] -= len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -71,14 +69,12 @@ def vlcRecvThread(config):
 		
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with rb_lock:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
 			pass
 		else:
-			with rb_lock:
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
-				ringBuffer[ptr][1] -= len(Data)
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+			ringBuffer[ptr][1] -= len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -86,9 +82,8 @@ def vlcRecvThread(config):
 	pass
 
 def recvStart():
-	global ringBuffer, rb_lock, config
+	global ringBuffer, config
 	
-	rb_lock = Lock()
 	wifiRecvHandle = Thread(target=wifiRecvThread, args=(config, ))
 	vlcRecvHandle = Thread(target=vlcRecvThread, args=(config, ))
 	redistHandle = Thread(target=redistThread, args=(redist_q, ))

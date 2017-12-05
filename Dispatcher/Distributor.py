@@ -91,7 +91,7 @@ class Distributor(Process):
 		self.vlc_q = Queue()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
-			(1.0,			0.0)
+			(0.5,			0.5)
 		)
 		#4 Operation Map Driver
 		self.ops_map = {
