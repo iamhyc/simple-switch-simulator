@@ -7,7 +7,7 @@ import json
 import socket
 import binascii, struct
 import Queue
-from threading import Thread, Lock
+from threading import Thread
 from time import ctime, sleep, time
 from optparse import OptionParser
 
@@ -16,8 +16,6 @@ global config, options
 global frame_struct, ringBuffer
 global fb_skt, fb_port, redist_skt, redist_q
 global wifiRecvHandle, vlcRecvHandle, redistHandle
-
-mutex = Lock()
 
 def unpack_helper(fmt, data):
     size = struct.calcsize(fmt)
@@ -29,7 +27,7 @@ def redistThread(redist_q):
 	while True:
 		if not redist_q.empty():
 			data = redist_q.get_nowait()
-			#print('Redistributed Data: %s'%(data))
+			print('Redistributed Data: %s'%(data))
 			redist_skt.sendto(data, ('localhost', 12306))#redistribution
 		sleep(0) #surrender turn
 		pass
@@ -47,16 +45,13 @@ def wifiRecvThread(config):
 
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			mutex.acquire()
-			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-			ringBuffer[ptr][2][Offset:Offset+Size] = Data
-			mutex.release()
+			ringBuffer[ptr][0:2] = Seq, Size
+			ringBuffer[ptr][4][Offset:Offset+Size] = Data
+			ringBuffer[ptr][2] = len(Data)
 			pass
 		else:
-			mutex.acquire()
-			ringBuffer[ptr][2][Offset:Offset+Size] = Data
-			ringBuffer[ptr][1] -= len(Data)
-			mutex.release()
+			ringBuffer[ptr][4][Offset:Offset+Size] = Data
+			ringBuffer[ptr][2] = len(Data)
 		#statistical collection here
     	#print(os.getpid())
     	sleep(0) #surrender turn
@@ -74,16 +69,13 @@ def vlcRecvThread(config):
 		
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			mutex.acquire()
-			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-			ringBuffer[ptr][2][Offset:Offset+Size] = Data
-			mutex.release()
+			ringBuffer[ptr][0:2] = Seq, Size
+			ringBuffer[ptr][4][Offset:Offset+Size] = Data
+			ringBuffer[ptr][3] = len(Data)
 			pass
 		else:
-			mutex.acquire()
-			ringBuffer[ptr][2][Offset:Offset+Size] = Data
-			ringBuffer[ptr][1] -= len(Data)
-			mutex.release()
+			ringBuffer[ptr][4][Offset:Offset+Size] = Data
+			ringBuffer[ptr][3] = len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -108,7 +100,8 @@ def recvStart():
 def agg_init():
 	global config, ringBuffer, redist_q, fb_port, fb_skt
 
-	ringBuffer = ([[-1, -1, []]] * config['sWindow'])
+	# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
+	ringBuffer = [[-1, -1, 0, 0, [chr(0)] * 4096]] * config['sWindow']
 	redist_q = Queue.Queue()
 	
 	req_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -150,10 +143,8 @@ def main():
 
 				sub_verified = False
 				while time()-timeout < config['Btimeout']:
-					if ringBuffer[ptr][1] == 0:
-						mutex.acquire()
-						redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
-						mutex.release()
+					if ringBuffer[ptr][1] - ringBuffer[ptr][2] - ringBuffer[ptr][3]== 0:
+						redist_q.put(''.join(ringBuffer[ptr][4][:ringBuffer[ptr][1]]))
 						sub_verified = True
 						break
 					pass
