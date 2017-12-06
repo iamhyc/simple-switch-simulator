@@ -161,7 +161,7 @@ def agg_exit():
 
 def main():
 	agg_init()
-	proc = new Processor()
+	proc = Processor()
 
 	req_skt.sendto(init_cmd, (options.server, config['udp_server_port']))
 	fb_port, addr = res_skt.recvfrom(1024)#block until feedback

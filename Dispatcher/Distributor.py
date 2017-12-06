@@ -3,7 +3,7 @@
 Dispatcher: for data flow manipulation
 @author: Mark Hong
 '''
-import json
+import json, random
 from time import sleep, ctime
 from multiprocessing import Process, Queue
 import thread
@@ -36,6 +36,12 @@ class QueueCoder:
 			self.splitter = [float(x) for x in ratio]
 		except Exception as e:
 			pass
+		pass
+
+	def clearAll():
+		for x in xrange(self.number):
+			self.tuple_q[x].queue.clear()
+		self.count = 0 #reset packet sequence
 		pass
 
 	def put(self, raw):
@@ -95,12 +101,14 @@ class Distributor(Process):
 		with open('../config.json') as cf:
 		 	self.config = json.load(cf)
 			pass
+		#2 Source Init
+		self.src = Source()
+		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
+		self.src.setSource(["static", data]) #udp/file_p/static
 		#2 Socket Init
-		self.src.setSource("static") #udp/file_p/static
 		self.__vlc_skt = None
 		self.__wifi_skt = None
 		#3 Socket Queue Init 
-		self.buffer = Queue()
 		self.wifi_q = Queue()
 		self.vlc_q = Queue()
 		self.encoder = QueueCoder(
@@ -109,7 +117,7 @@ class Distributor(Process):
 		)
 		#4 Operation Map Driver
 		self.ops_map = {
-			"src":self.src.setSource,
+			"src":self.resetSource,
 			"set":self.setValue,
 			"ratio":self.encoder.setRatio,
 		}
@@ -127,18 +135,19 @@ class Distributor(Process):
 	def setValue(self, tuple):
 		pass
 
-	def setSource(self, src):
+	def resetSource(self, cmd):
+		self.encoder.clearAll()
+		self.src.setSource(cmd)
 		pass
 
 	def dist_start(self):
 		#init feedback link --> non-blocking check
 		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
 		#init transmission link --> idle
-		thread.start_new_thread(self.distXmitThread,())
 		thread.start_new_thread(self.vlcXmitThread, (self.config['udp_vlc_port_tx'], ))
 		thread.start_new_thread(self.wifiXmitThread, (self.config['udp_wifi_port'], ))
 		#init data source --> busy
-		thread.start_new_thread(self.sourceThread, (self.config['udp_src_port'], ))
+		thread.start_new_thread(self.distXmitThread,())
 		pass
 
 	def dist_stop(self):
@@ -179,11 +188,10 @@ class Distributor(Process):
 
 	def distXmitThread(self):
 		while True:
-			if not self.buffer.empty():
-				raw = self.buffer.get_nowait()
+			if not self.src.empty():
+				raw = self.src.get()
 				self.encoder.put(raw)
 				pass
-			sleep(0)#surrender turn
 			pass
 		pass
 

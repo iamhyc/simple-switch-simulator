@@ -1,6 +1,6 @@
 #! /usr/bin/python
 '''
-Dispatcher: for instruction manipulation
+Dispatcher: for command manipulation
 @author: Mark Hong
 '''
 import json
@@ -32,7 +32,8 @@ def cmd_parse(str):
 def set_source(cmd, addr):
 	task_id = cmd[0]
 	if proc_map.has_key(task_id):
-		proc_map[]
+		p2c_cmd = ''.join(['src'] + cmd[1:])
+		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
 		pass
 	pass
 
@@ -62,7 +63,7 @@ def add_client(cmd, addr):
 	proc_map[task_id]['_thread'].start()
 
 	skt_res.sendto(str(port), (addr, config['udp_client_port']))
-	skt_res.sendto('trick', (addr, 11081))
+	skt_res.sendto('trick', (addr, 11081)) #trick
 	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 
 	ClientCount += 1

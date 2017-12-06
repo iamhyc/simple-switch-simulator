@@ -3,11 +3,10 @@
 Source: Data Flow Source
 @author: Mark Hong
 '''
-import threading
+import threading, Queue
 import random
 
-
-class Source(thrading.Thread):
+class Source:
 	"""docstring for Source
 		Two types of Source:
 		* UDP Broadcast, single port occupy
@@ -15,15 +14,34 @@ class Source(thrading.Thread):
 		* static, static content (tap-generator)
 	"""
 	def __init__(self):
-		super(Source, self).__init__()
-		
+		self.speed = -1 #no limit
+		self.buffer = Queue()
 		self.type = 'static'
-		self.source = ''
+		self.char = ''
+		self.sourceHandle = Thread(target=bufferThread)
+		self.sourceHandle.setDaemon(True)
 		pass
 
-	def setSource():
+	def setSource(cmd):
+		self.buffer.queue.clear()
+
+		case, data = cmd
+		if case=='static':
+			self.char = data
+			pass
+		elif case=='udp':
+			pass
+		else case=='file':
+			pass
 		pass
 
-	def run(self):
+	def bufferThread(self):
+		#fill in buffer according to speed limit
 		pass
+
+	def empty(self):
+		return self.buffer.empty()
+
+	def get(self):
+		return self.buffer.get_nowait()
 		
