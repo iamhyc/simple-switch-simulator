@@ -11,6 +11,8 @@ import socket
 import binascii, struct, ctypes
 import crcmod.predefined
 
+from Source import Source
+
 class QueueCoder:
 	"""docstring for QueueCoder"""
 	def __init__(self, tuple_q, ratio_list):
@@ -94,7 +96,7 @@ class Distributor(Process):
 		 	self.config = json.load(cf)
 			pass
 		#2 Socket Init
-		#self.setSource("static") #udp/file_p/static
+		self.src.setSource("static") #udp/file_p/static
 		self.__vlc_skt = None
 		self.__wifi_skt = None
 		#3 Socket Queue Init 
@@ -107,6 +109,7 @@ class Distributor(Process):
 		)
 		#4 Operation Map Driver
 		self.ops_map = {
+			"src":self.src.setSource,
 			"set":self.setValue,
 			"ratio":self.encoder.setRatio,
 		}
