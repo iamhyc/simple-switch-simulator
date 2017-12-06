@@ -29,6 +29,13 @@ def cmd_parse(str):
 	return op, cmd
 	pass
 
+def set_source(cmd, addr):
+	task_id = cmd[0]
+	if proc_map.has_key(task_id):
+		proc_map[]
+		pass
+	pass
+
 def process_print(cmd, addr):
 	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
 	skt_res.sendto(proc_list, (addr, config['udp_client_port']))
@@ -117,7 +124,8 @@ if __name__ == '__main__':
 	ops_map = {
 		"ls":process_print,
 		"add":add_client,
-		"rm":remove_client
+		"rm":remove_client,
+		"src":set_source
 	}
 
 	print("Dispatcher is now online...")

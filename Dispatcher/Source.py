@@ -4,6 +4,7 @@ Source: Data Flow Source
 @author: Mark Hong
 '''
 import threading
+import random
 
 
 class Source(thrading.Thread):
@@ -15,6 +16,12 @@ class Source(thrading.Thread):
 	"""
 	def __init__(self):
 		super(Source, self).__init__()
+		
+		self.type = 'static'
+		self.source = ''
+		pass
+
+	def setSource():
 		pass
 
 	def run(self):

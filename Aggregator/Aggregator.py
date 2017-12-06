@@ -27,7 +27,8 @@ class Processor(Thread):
 		self.numB = -1 #stop sequence
 		pass
 
-	def run(self):
+	def process(self):
+		#recvStart()
 		# should with start and end seq
 		while ringBuffer[0][0] != 0:
 			sleep(0.1) # wait
@@ -65,6 +66,10 @@ class Processor(Thread):
 				print("Packet %d loss."%(cnt))
 				pass
 			pass
+		pass
+
+	def run(self):
+		
 		pass
 
 def cmd_parse(str):
@@ -172,9 +177,6 @@ def main():
 		op, cmd = cmd_parse(data)
 		ops_map[op](cmd) # need a ops_map
 		pass
-	
-	#recvStart()
-
 	
 	pass
 
