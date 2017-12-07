@@ -29,12 +29,15 @@ def cmd_parse(str):
 	return op, cmd
 	pass
 
-def response(status, addr, optional):
+def response(status, addr, optional=''):
 	if status:
 		frame = '+'
 	else:
 		frame = '-'
-	frame += '\n' + optional
+
+	if optional != '':
+		frame += '\n' + optional
+	
 	skt_res.sendto(frame, (addr, config['converg_term_port']))
 	pass
 
