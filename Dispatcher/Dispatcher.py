@@ -35,6 +35,9 @@ def set_source(cmd, addr):
 		p2c_cmd = ''.join(['src'] + cmd[1:])
 		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
 		pass
+	else:
+		# exception handling here
+		pass
 	pass
 
 def process_print(cmd, addr):
@@ -61,6 +64,9 @@ def add_client(cmd, addr):
 								)
 	proc_map[task_id]['_thread'].daemon = True #set as daemon process
 	proc_map[task_id]['_thread'].start()
+
+	#set default source
+	p2c_q.put_nowait('src udp ' + config['udp_src_port'])
 
 	skt_res.sendto(str(port), (addr, config['udp_client_port']))
 	skt_res.sendto('trick', (addr, 11081)) #trick
@@ -104,7 +110,7 @@ def disp_exit():
 def main():
 	disp_init()
 	while True:
-		#skt_req.settimeout(15) #for debug
+		#skt_req.settimeout(15) #for windows debug
 		data, addr = skt_req.recvfrom(1024)
 		op, cmd = cmd_parse(data)
 		try:

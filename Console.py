@@ -1,5 +1,6 @@
 #! /usr/bin/python
 import os, time, json
+from termcolor import colored, cprint
 from getpass import getuser
 import platform as pt
 import socket
@@ -50,7 +51,7 @@ def main():
 	_cls()
 	helper()
 	while True:
-		tipstr = localuser+"@Aggregator:["+time.ctime()+"]$ "
+		tipstr = colored(localuser+" @ Aggregator:["+time.ctime()+"]\n$ ", 'cyan', 'on_grey')
 		op, cmd = cmd_parse(raw_input(tipstr))
 
 		try:
@@ -58,7 +59,7 @@ def main():
 				skt_cmd.sendto('ls', (remote_cmdip, config['udp_server_port']))
 				data, ADDR = skt_recv.recvfrom(1024)
 				_cls()
-				print("%s\n"%(data))
+				cprint("%s\n"%(data), 'green')
 				helper()
 				pass
 			elif op=='add' and len(cmd)>=2:
@@ -86,11 +87,11 @@ def main():
 				quit()
 				pass
 			else:
-				print("\t\tNot Supported Format or Instruction...\n")
+				cprint("Not Supported Format or Command.", 'red')
 			pass
 		except Exception as e:
 			#raise e ##for debug
-			print("...")
+			cprint("...", 'red')
 			pass
 		pass
 	pass

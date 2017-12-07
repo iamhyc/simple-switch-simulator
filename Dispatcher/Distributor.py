@@ -11,7 +11,7 @@ import socket
 import binascii, struct, ctypes
 import crcmod.predefined
 
-from Source import Source
+from StreamSource import StreamSource
 
 class QueueCoder:
 	"""docstring for QueueCoder"""
@@ -102,22 +102,21 @@ class Distributor(Process):
 		 	self.config = json.load(cf)
 			pass
 		#2 Source Init
-		self.src = Source()
+		self.src = StreamSource(["static", data]) #udp/file_p/static
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
-		self.src.setSource(["static", data]) #udp/file_p/static
-		#2 Socket Init
+		#3 Socket Init
 		self.__vlc_skt = None
 		self.__wifi_skt = None
-		#3 Socket Queue Init 
+		#4 Socket Queue Init 
 		self.wifi_q = Queue()
 		self.vlc_q = Queue()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
-			(0.5,			0.5)
+			(0.0,			1.0)
 		)
-		#4 Operation Map Driver
+		#5 Operation Map Driver
 		self.ops_map = {
-			"src":self.resetSource,
+			"src":self.configSource,
 			"set":self.setValue,
 			"ratio":self.encoder.setRatio,
 		}
@@ -135,9 +134,9 @@ class Distributor(Process):
 	def setValue(self, tuple):
 		pass
 
-	def resetSource(self, cmd):
-		self.encoder.clearAll()
-		self.src.setSource(cmd)
+	def configSource(self, cmd):
+		if self.src.config(cmd): #True for Restart
+			self.encoder.clearAll()
 		pass
 
 	def dist_start(self):
@@ -168,22 +167,6 @@ class Distributor(Process):
 				self.fb_q.put(' '.join(task_id, cmd))#push into queue straightly
 			except Exception as e:
 				pass
-			sleep(0)#surrender turn
-		pass
-
-	def sourceThread(self, port):
-		src_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		src_skt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
-		src_skt.setblocking(0)
-		src_skt.bind(('', port)) 
-		while True:
-			try:
-				data = src_skt.recv(4096)
-				self.buffer.put_nowait(data)
-				#print('Source Data: %s'%(data)) #for debug
-			except Exception as e:
-				pass
-			sleep(0)#surrender turn
 		pass
 
 	def distXmitThread(self):
@@ -204,7 +187,6 @@ class Distributor(Process):
 				#print('To VLC link: %s'%(data))
 				self.__vlc_skt.sendto(data, (self.vlc_ip, port))
 				pass
-			sleep(0)#surrender turn
 		pass
 
 	def wifiXmitThread(self, port):
@@ -216,7 +198,6 @@ class Distributor(Process):
 				#print('To Wi-Fi link: %s'%(data))
 				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
 				pass
-			sleep(0)#surrender turn
 		pass
 
 	def run(self):
@@ -228,7 +209,6 @@ class Distributor(Process):
 					op, cmd = cmd_parse(data)
 					self.ops_map[op](cmd)
 					pass
-				sleep(0)#surrender turn
 				pass
 		except Exception as e:
 			print(e) #for debug
