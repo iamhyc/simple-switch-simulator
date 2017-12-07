@@ -46,7 +46,7 @@ def main():
 	skt_cmd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	skt_recv.settimeout(3.0)#3 seconds
-	skt_recv.bind(('', config['udp_client_port']))
+	skt_recv.bind(('', config['converg_term_port']))
 
 	_cls()
 	helper()
@@ -56,7 +56,7 @@ def main():
 
 		try:
 			if op=='ls':
-				skt_cmd.sendto('ls', (remote_cmdip, config['udp_server_port']))
+				skt_cmd.sendto('ls', (remote_cmdip, config['converg_disp_port']))
 				data, ADDR = skt_recv.recvfrom(1024)
 				_cls()
 				cprint("%s\n"%(data), 'green')
@@ -65,14 +65,14 @@ def main():
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1> <ip2>'
 				tmp = ('%s %s %s'%('add', cmd[0], cmd[1]))
-				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
+				skt_cmd.sendto(tmp, (remote_cmdip, config['converg_disp_port']))
 				data, ADDR = skt_recv.recvfrom(1024) #receive port allocation
 				print(tmp)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
 				tmp = ('%s %s'%("rm", cmd[0]))
-				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
+				skt_cmd.sendto(tmp, (remote_cmdip, config['converg_disp_port']))
 				print(tmp)
 				pass
 			elif op=='sc' and len(cmd)>=1:

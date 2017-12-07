@@ -101,12 +101,15 @@ class Distributor(Process):
 		with open('../config.json') as cf:
 		 	self.config = json.load(cf)
 			pass
-		#2 Source Init
-		self.src = StreamSource(["static", data]) #udp/file_p/static
+
+		#2 plugin Source Init
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
+		self.src = StreamSource(["static", data]) #udp/file_p/static
+
 		#3 Socket Init
 		self.__vlc_skt = None
 		self.__wifi_skt = None
+
 		#4 Socket Queue Init 
 		self.wifi_q = Queue()
 		self.vlc_q = Queue()
@@ -114,9 +117,11 @@ class Distributor(Process):
 			(self.wifi_q,	self.vlc_q),
 			(0.0,			1.0)
 		)
+
 		#5 Operation Map Driver
 		self.ops_map = {
 			"src":self.configSource,
+			"src-now":self.triggerSource,
 			"set":self.setValue,
 			"ratio":self.encoder.setRatio,
 		}
@@ -134,6 +139,10 @@ class Distributor(Process):
 	def setValue(self, tuple):
 		pass
 
+	def triggerSource(self, cmd):
+		self.src.pause(False)
+		pass
+
 	def configSource(self, cmd):
 		if self.src.config(cmd): #True for Restart
 			self.encoder.clearAll()
@@ -143,8 +152,8 @@ class Distributor(Process):
 		#init feedback link --> non-blocking check
 		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
 		#init transmission link --> idle
-		thread.start_new_thread(self.vlcXmitThread, (self.config['udp_vlc_port_tx'], ))
-		thread.start_new_thread(self.wifiXmitThread, (self.config['udp_wifi_port'], ))
+		thread.start_new_thread(self.vlcXmitThread, (self.config['stream_vlc_port_tx'], ))
+		thread.start_new_thread(self.wifiXmitThread, (self.config['stream_wifi_port'], ))
 		#init data source --> busy
 		thread.start_new_thread(self.distXmitThread,())
 		pass

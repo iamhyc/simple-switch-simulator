@@ -10,8 +10,14 @@ from time import ctime, sleep
 from urllib2 import urlopen
 
 def zeroPadding(length, data):
+	raw_len = len(data)
+	if raw_len > 0:
 		pad_len = length - len(data)
 		return data + chr(0) * pad_len
+		pass
+	else:
+		return ''
+
 
 class udp_ops_class:
 	"""docstring for udp_ops_class"""
@@ -70,7 +76,7 @@ class StreamSource:
 		# Source Stream Control
 		self.speed = maxint #no limit
 		self.length = 1500 #default value
-		self.paused = False
+		self.paused = True
 		self.ops_map = {
 			'udp':setSource,
 			'static':setSource,
@@ -102,11 +108,11 @@ class StreamSource:
 
 	def setSource(self, cmd):
 		self.paused = True # pause read operation
-		self.data_close_op() # close previous source
+		self.data.data_close_op() # close previous source
 		self.buffer.queue.clear() # clear previous buffer
 
 		self.data = self.src_map[cmd[0]](cmd[1], self.length)
-		self.paused = False
+		#self.paused = False # Disable auto-start
 		return True # need reset
 
 	def config(self, cmd):
@@ -129,9 +135,14 @@ class StreamSource:
 		while not self.paused:
 			interval = self.length / self.speed
 			try:
-				data = self.data_read_op()
-				self.buffer.put_nowait(data)
-				#print('Source Data: %s'%(data)) #for debug
+				data = self.data.data_read_op()
+				if not data:
+					self.paused = True
+					pass
+				else:
+					self.buffer.put_nowait(data)
+					#print('Source Data: %s'%(data)) #for debug
+					pass
 				sleep(interval)
 			except Exception as e:
 				pass

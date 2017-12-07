@@ -139,8 +139,8 @@ def agg_init():
 		pass
 	redist_q = Queue.Queue()
 	#Thread Handle Init
-	wifiRecvHandle = Thread(target=RecvThread, args=('Wi-Fi', config['udp_wifi_port'], config))
-	vlcRecvHandle = Thread(target=RecvThread, args=('VLC', config['udp_vlc_port_rx'], config))
+	wifiRecvHandle = Thread(target=RecvThread, args=('Wi-Fi', config['stream_wifi_port'], config))
+	vlcRecvHandle = Thread(target=RecvThread, args=('VLC', config['stream_vlc_port_rx'], config))
 	redistHandle = Thread(target=redistThread, args=(redist_q, ))
 	wifiRecvHandle.setDaemon(True)
 	vlcRecvHandle.setDaemon(True)
