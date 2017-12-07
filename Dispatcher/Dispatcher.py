@@ -85,10 +85,11 @@ def remove_client(cmd, addr):
 	pass
 
 def set_source(cmd, addr):
-	task_id = proc_remap[addr] if cmd[0]<-1 else cmd[0] #-1 for no id
+	task_id = proc_remap[addr] if cmd[0] <= -1 else cmd[0] #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = ''.join(['src'] + cmd[1:])
 		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
+		response(True, addr)
 		pass
 	else:
 		response(False, addr)
@@ -96,10 +97,11 @@ def set_source(cmd, addr):
 	pass
 
 def start_source(cmd, addr):
-	task_id = proc_remap[addr] if cmd[0]<-1 else cmd[0] #-1 for no id
+	task_id = proc_remap[addr] if cmd[0] <= -1 else cmd[0] #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = 'src-now'
 		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
+		response(True, addr)
 		pass
 	else:
 		response(False, addr)
