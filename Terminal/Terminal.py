@@ -7,9 +7,10 @@ Terminal: for command manipulation
 from Aggregator import Aggregator
 
 import json
-import socket
-from threading import Thread
+import socket, string, binascii
 from time import ctime, sleep, time
+from threading import Thread
+from multiprocessing import Process, Queue
 from optparse import OptionParser
 
 def term_exit():
@@ -18,6 +19,10 @@ def term_exit():
 	pass
 
 def main():
+	term_init()
+
+	while True:
+		pass
 	pass
 
 if __name__ == '__main__':

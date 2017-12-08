@@ -4,7 +4,6 @@ Dispatcher: for command manipulation
 @author: Mark Hong
 '''
 import json
-from time import sleep, ctime
 from multiprocessing import Process, Queue
 from threading import Thread
 import socket, string, binascii
