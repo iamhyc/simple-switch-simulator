@@ -36,29 +36,45 @@ def response(status, sock, optional=''):
 		frame = '-'
 
 	if optional != '':
-		frame += '\n' + optional
+		frame += optional
 	
 	skt_res.send(frame)
 	pass
 
+def request(frame, sock, timeout=None):
+	sock.settimeout(timeout)
+	sock.send(frame)
+	status = sock.recv()
+	sock.settimeout(None)
+	if status[0]=='+':
+		return True
+	else:
+		return False
+	pass
+
 def process_print(cmd, sock, addr):
 	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
-	response(True, addr, proc_list)
+	response(True, sock, proc_list)
 	pass
 
 def register_client(cmd, sock, addr):
 	global ClientCount
 
-	wifi_ip, vlc_ip = cmd
+	wifi_ip, vlc_ip, rc = cmd
 	task_id = ClientCount #allocate task_id
 	port = ALLOC_PORT_BASE + ClientCount #allocate port nubmer
 
 	p2c_q = Queue() #Parent to Child Queue
 
+	if rc == '0':
+		proc_map[task_id]['req_sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		proc_map[task_id]['req_sock'].connect((addr, config['converg_term_port']))
+		pass
+
 	proc_remap[wifi_ip] = task_id #revese map over Wi-Fi link
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
-	proc_map[task_id]['sock'] = sock
+	proc_map[task_id]['res_sock'] = sock
 	proc_map[task_id]['queue'] = (p2c_q, fb_q)
 	proc_map[task_id]['_thread'] = Distributor(
 									task_id,
@@ -69,8 +85,7 @@ def register_client(cmd, sock, addr):
 	proc_map[task_id]['_thread'].start()
 	#default source with `unique` <static> data, and wait to trigger
 
-	response(True, addr, str(port))
-	#skt_res.sendto('kick', (addr, 11081)) #kick VLC receiver
+	response(True, sock, str(port))
 	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 
 	ClientCount += 1
@@ -93,11 +108,11 @@ def set_source(cmd, sock, addr):
 	if proc_map.has_key(task_id):
 		p2c_cmd = ''.join(['src'] + cmd[1:])
 		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
+		request('src-now', proc_map[task_id]['req_sock']) # notify Terminal side
 		response(True, sock) # to Controller Side
-		#response(True, proc_map[task_id]['char'][0]) # To Wi-Fi Side
 		pass
 	else:
-		response(False, addr)
+		response(False, sock)
 		pass
 	pass
 
@@ -106,15 +121,15 @@ def start_source(cmd, sock, addr):
 	if proc_map.has_key(task_id):
 		p2c_cmd = 'src-now'
 		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
-		response(True, addr)
+		response(True, sock)
 		pass
 	else:
-		response(False, addr)
+		response(False, sock)
 		pass
 	pass
 
 def idle_work(cmd, sock, addr):
-	response(True, addr)
+	response(True, sock)
 	pass
 
 def disp_init():
@@ -160,18 +175,16 @@ def tcplink(sock, addr):
 		except Exception as e:
 			print('\nErrorCode: %s'%(e))
 			print('\"%s\" from %s'%(data, addr))
-			sock.send(op+' Failed')
-			sock.close()
+			response(False, sock)
 			pass
 		pass
-		pass
+	pass
 
 def main():
 	disp_init()
 	# Converg Layer Dispatcher
 
 	while True:
-		#skt_req.settimeout(15) #for Windows debug
 		sock, addr = skt.accept()
 		t = Thread(target=tcplink, args=(sock, addr))
     	t.start()

@@ -42,11 +42,19 @@ def cmd_parse(str):
 def script_file(file):
 	pass
 
+def request(frame, timeout=None):
+	skt.settimeout(timeout)
+	skt.send(frame)
+	data = skt.recv()
+	skt.settimeout(None)
+	
+	return data[0], data[1:]
+	pass
+
 def main():
-	skt_cmd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_recv.settimeout(3.0)#3 seconds
-	skt_recv.bind(('', config['converg_term_port']))
+	global skt
+	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	skt.connect(('', config['converg_disp_port']))
 
 	_cls()
 	helper()
@@ -56,8 +64,7 @@ def main():
 
 		try:
 			if op=='ls':
-				skt_cmd.sendto('ls', (remote_cmdip, config['converg_disp_port']))
-				data, ADDR = skt_recv.recvfrom(1024)
+				status, data = request('ls', 3)
 				_cls()
 				cprint("%s\n"%(data), 'green')
 				helper()
@@ -65,14 +72,13 @@ def main():
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1> <ip2>'
 				tmp = ('%s %s %s'%('add', cmd[0], cmd[1]))
-				skt_cmd.sendto(tmp, (remote_cmdip, config['converg_disp_port']))
-				data, ADDR = skt_recv.recvfrom(1024) #receive port allocation
+				status, data = request(tmp, 3)
 				print(tmp)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
 				tmp = ('%s %s'%("rm", cmd[0]))
-				skt_cmd.sendto(tmp, (remote_cmdip, config['converg_disp_port']))
+				status, data = request(tmp, 3)
 				print(tmp)
 				pass
 			elif op=='sc' and len(cmd)>=1:
