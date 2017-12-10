@@ -46,9 +46,9 @@ def request(frame, timeout=None):
 	skt.settimeout(timeout)
 	skt.send(frame)
 	data = skt.recv()
+	status = True if data=='+' else False
 	skt.settimeout(None)
-	
-	return data[0], data[1:]
+	return status, data[1:]
 	pass
 
 def main():
@@ -71,7 +71,7 @@ def main():
 				pass
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1> <ip2>'
-				tmp = ('%s %s %s'%('add', cmd[0], cmd[1]))
+				tmp = ('%s %s %s 1'%('add', cmd[0], cmd[1]))
 				status, data = request(tmp, 3)
 				print(tmp)
 				pass

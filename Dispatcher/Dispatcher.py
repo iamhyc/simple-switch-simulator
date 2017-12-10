@@ -65,11 +65,6 @@ def register_client(cmd, sock, addr):
 
 	p2c_q = Queue() #Parent to Child Queue
 
-	if rc == '0':
-		proc_map[task_id]['req_sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		proc_map[task_id]['req_sock'].connect((addr, config['converg_term_port']))
-		pass
-
 	proc_remap[wifi_ip] = task_id #revese map over Wi-Fi link
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
@@ -85,6 +80,10 @@ def register_client(cmd, sock, addr):
 	#default source with `unique` <static> data, and wait to trigger
 
 	response(True, sock, str(port))
+	if rc == '0':
+		proc_map[task_id]['req_sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		proc_map[task_id]['req_sock'].connect((addr, config['converg_term_port']))
+		pass
 	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 
 	ClientCount += 1

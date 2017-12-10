@@ -141,6 +141,7 @@ class Distributor(Process):
 
 	def triggerSource(self, cmd):
 		self.src.pause(False)
+		self.src.sourceHandle.start()
 		pass
 
 	def configSource(self, cmd):

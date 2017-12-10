@@ -7,22 +7,20 @@ import json
 import socket
 import binascii, struct
 import Queue
-from threading import Thread
+import threading, multiprocessing
 from time import ctime, sleep, time
 from optparse import OptionParser
 
-global ringBuffer
-global config, options
 global frame_struct, ringBuffer
 global fb_skt, fb_port, redist_skt, redist_q
 global wifiRecvHandle, vlcRecvHandle, redistHandle
 
-class Processor(Thread):
-	"""docstring for Processor
+class Aggregator(Thread):
+	"""docstring for Aggregator
 
 	"""
 	def __init__(self, arg):
-		super(Processor, self).__init__()
+		super(Aggregator, self).__init__()
 		self.numA = 0 #start sequence
 		self.numB = -1 #stop sequence
 		pass
@@ -130,7 +128,7 @@ def recvStart():
 
 def agg_init():
 	global config, ringBuffer, redist_q, fb_port, fb_skt, req_skt, res_skt
-
+	frame_struct = struct.Struct('IHH') #Or, Struct('IB')	
 	# RingBuffer Init
 	# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
 	ringBuffer = [0] * config['sWindow']
@@ -146,12 +144,7 @@ def agg_init():
 	vlcRecvHandle.setDaemon(True)
 	redistHandle.setDaemon(True)
 
-	# Server Socket Init
-	req_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	res_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	res_skt.bind(('', config['udp_client_port']))
-	res_skt.settimeout(5)
 	pass
 
 def agg_exit():
@@ -163,12 +156,10 @@ def main():
 	agg_init()
 	proc = Processor()
 
-	req_skt.sendto(init_cmd, (options.server, config['udp_server_port']))
-	fb_port, addr = res_skt.recvfrom(1024)#block until feedback
+	
 	try:
 		#hope no error here...
-		fb_port = int(fb_port)
-		print('Connected with uplink port %d.'%(fb_port))
+		
 	except Exception as e:
 		raise e
 
@@ -179,35 +170,3 @@ def main():
 		pass
 	
 	pass
-
-
-if __name__ == '__main__':
-	with open('../config.json') as cf:
-		config = json.load(cf)
-		pass
-
-	parser = OptionParser()
-	parser.add_option("-s", "--server",
-		dest="server", 
-		default="localhost", 
-		help="Designate the dispatcher server")
-	parser.add_option("-w", "--wifi",
-		dest="wifi", 
-		default="localhost", 
-		help="Designate the Wi-Fi interface")
-	parser.add_option("-v", "--vlc",
-		dest="vlc", 
-		default="localhost", 
-		help="Designate the VLC interface")
-	(options, args) = parser.parse_args()
-
-	frame_struct = struct.Struct('IHH') #Or, Struct('IB')
-	init_cmd = ('%s %s %s'%('add', options.wifi, options.vlc))
-
-	try: #cope with Interrupt Signal
-		main()
-	except Exception as e:
-		print(e) #for debug
-		pass
-	finally:
-		agg_exit()

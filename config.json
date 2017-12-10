@@ -8,7 +8,7 @@
 	"converg_term_port":11111,
 
 	"stream_src_port":10086,
-	"stream_uplink_port":0,
+	"stream_uplink_port":"__Dynamic Assignate__",
 	"stream_wifi_port":11112,
 	"stream_vlc_port_tx":11113,
 	"stream_vlc_port_rx":11113,
