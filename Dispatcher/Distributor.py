@@ -38,7 +38,10 @@ class QueueCoder:
 		self.crcFrame = struct.Struct('IHH')
 		self.crcBuffer = ctypes.create_string_buffer(self.crcFrame.size)
 		#(ring)Buffer Array as tx sliding window
-		self.tx_window = [[chr(0)] * self.number] * sWindow
+		self.tx_window = [0] * sWindow
+		for x in xrange(sWindow):
+			self.tx_window[x] = [chr(0)] * self.number
+			pass
 		pass
 
 	def setRatio(self, ratio):
@@ -50,10 +53,21 @@ class QueueCoder:
 			pass
 		pass
 
-	def clearAll():
+	def clearAll(self):
 		for x in xrange(self.number):
 			self.tuple_q[x].queue.clear()
+		del self.tx_window #dec reference counter
 		self.count = 0 #reset packet sequence
+		pass
+
+	def reput(self, seq):
+		for x in xrange(self.number):
+			tmp = seq % self.win_size
+			tmp_str = self.tx_window[tmp][x]
+			if len(tmp_str):
+				self.tuple_q[x].put_nowait(tmp_str)
+				pass
+			pass
 		pass
 
 	def put(self, raw):
@@ -87,7 +101,11 @@ class QueueCoder:
 		#then, straightly push into each split queue
 		for x in xrange(self.number):
 			if len(data[x]):
+				tmp = self.count % self.win_size
+				self.tx_window[tmp][x] = data[x]
 				self.tuple_q[x].put_nowait(data[x])
+				pass
+			pass
 
 		self.count += 1
 		print(self.count)
@@ -179,7 +197,13 @@ class Distributor(Process):
 		while True:
 			try:
 				data = fb_skt.recv(1024)
-				self.fb_q.put(' '.join(task_id, cmd))#push into queue straightly
+				status, data = data[0], data[1:]
+				if status=='+': #statistical data
+					self.fb_q.put(' '.join([task_id, data[1:]]))
+					pass
+				elif status=='-': #retransmission rquest
+					self.encoder.reput(int(data))
+					pass
 			except Exception as e:
 				pass
 		pass

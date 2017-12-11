@@ -14,6 +14,7 @@ And a cache node controller based on Content-request service (P/S struct).
 |   LS    |         |        |         |        |
 |   RM    |   ID    |        |         |        |
 |   SRC   |   ID    |  TYPE  |  DATA   |        |
+|   SRC   |   ID    |  KEY   |  VALUE  |        |
 | SRC-NOW |   ID    |        |         |        |
 |  IDLE   |   ID    |        |         |        |
 

@@ -55,12 +55,16 @@ def request(frame, sock, timeout=None):
 	pass
 
 def exec_nowait(task_id, cmd):
-	proc_map[task_id]['queue'][1].queue.clear()
+	while not proc_map[task_id]['queue'][1].empty():
+		proc_map[task_id]['queue'][1].get()
+		pass
 	proc_map[task_id]['queue'][0].put_nowait(cmd)
 	pass
 
 def exec_wait(task_id, cmd):
-	proc_map[task_id]['queue'][1].queue.clear()
+	while not proc_map[task_id]['queue'][1].empty():
+		proc_map[task_id]['queue'][1].get()
+		pass
 	proc_map[task_id]['queue'][0].put_nowait(cmd)
 	while proc_map[task_id]['queue'][1].empty():
 		pass
@@ -70,12 +74,12 @@ def exec_wait(task_id, cmd):
 '''
 Process Command Function
 '''
-def process_print(cmd, sock, addr):
+def process_print_op(cmd, sock, addr):
 	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
 	response(True, sock, proc_list)
 	pass
 
-def register_client(cmd, sock, addr):
+def register_client_op(cmd, sock, addr):
 	global ClientCount
 
 	wifi_ip, vlc_ip, rc = cmd
@@ -109,7 +113,7 @@ def register_client(cmd, sock, addr):
 	ClientCount += 1
 	pass
 
-def remove_client(cmd, sock, addr):
+def remove_client_op(cmd, sock, addr):
 	task_id = cmd[0]
 	if not proc_map.has_key(task_id):
 		raise Exception
@@ -121,7 +125,7 @@ def remove_client(cmd, sock, addr):
 	response(True, sock)
 	pass
 
-def set_source(cmd, sock, addr):
+def set_source_op(cmd, sock, addr):
 	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = ''.join(['src'] + cmd[1:])
@@ -138,7 +142,7 @@ def set_source(cmd, sock, addr):
 		pass
 	pass
 
-def start_source(cmd, sock, addr):
+def start_source_op(cmd, sock, addr):
 	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = 'src-now'
@@ -150,7 +154,7 @@ def start_source(cmd, sock, addr):
 		pass
 	pass
 
-def idle_work(cmd, sock, addr):
+def idle_work_op(cmd, sock, addr):
 	response(True, sock)
 	pass
 
@@ -165,13 +169,13 @@ def disp_init():
 	proc_remap = {}
 	ops_map = {
 		# General Operation
-		"ls":process_print,
-		"add":register_client,
+		"ls":process_print_op,
+		"add":register_client_op,
 		# Specific Operation
-		"rm":remove_client,
-		"src":set_source,
-		"src-now":start_source
-		"idle":idle_work
+		"rm":remove_client_op,
+		"src":set_source_op,
+		"src-now":start_source_op,
+		"idle":idle_work_op
 	}
 	# converg Socket Init
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

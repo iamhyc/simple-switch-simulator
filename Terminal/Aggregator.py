@@ -62,6 +62,36 @@ class Aggregator(multiprocessing.Process):
 			pass
 		pass
 
+	def RecvThread(name, port, config):
+		global ringBuffer
+		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		recv_skt.bind(('', port))
+
+		while True:
+			raw, addr = recv_skt.recvfrom(4096)
+			(Seq, Size, Offset, CRC), Data = unpack_helper(config['struct'], raw)
+			#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
+
+			ptr = Seq % config['sWindow_rx']
+			if ringBuffer[ptr][0] != Seq:
+				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+				ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+				pass
+			else:
+				ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+				ringBuffer[ptr][1] -= len(Data)
+				pass
+			#statistical collection here
+	    	#print(os.getpid())
+	    	sleep(0) #surrender turn
+		pass
+
+	def recvStart():
+		redistHandle.start()
+		wifiRecvHandle.start()
+		vlcRecvHandle.start()
+		pass
+
 	def process(self):
 		#recvStart()
 		# should with start and end seq
@@ -107,36 +137,6 @@ class Aggregator(multiprocessing.Process):
 		
 		pass
 
-
-def RecvThread(name, port, config):
-	global ringBuffer
-	recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	recv_skt.bind(('', port))
-
-	while True:
-		raw, addr = recv_skt.recvfrom(4096)
-		(Seq, Size, Offset, CRC), Data = unpack_helper(config['struct'], raw)
-		#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
-
-		ptr = Seq % config['sWindow_rx']
-		if ringBuffer[ptr][0] != Seq:
-			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
-			pass
-		else:
-			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
-			ringBuffer[ptr][1] -= len(Data)
-			pass
-		#statistical collection here
-    	#print(os.getpid())
-    	sleep(0) #surrender turn
-	pass
-
-def recvStart():
-	redistHandle.start()
-	wifiRecvHandle.start()
-	vlcRecvHandle.start()
-	pass
 
 def agg_init():
 	global config, ringBuffer, redist_q, fb_port, fb_skt, req_skt, res_skt

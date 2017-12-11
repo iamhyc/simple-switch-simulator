@@ -3,7 +3,7 @@
 Source: Data Flow Source
 @author: Mark Hong
 '''
-import json
+import json, math
 import threading, Queue
 import os.path.getsize
 from sys import maxint
@@ -49,7 +49,8 @@ class file_ops_class:
 		pass
 
 	def data_getsize_op(self):
-		return os.path.getsize(self.url)
+		size = float(os.path.getsize(self.url))
+		return math.ceil(size/self.length)
 	
 	def data_read_op(self):
 		data = res.read(self.length)
@@ -67,7 +68,7 @@ class static_ops_class:
 		pass
 	
 	def data_getsize_op(self):
-		return len(self.data)
+		return -1
 
 	def data_read_op(self):
 		return zeroPadding(self.length, self.data)
