@@ -3,8 +3,9 @@
 Source: Data Flow Source
 @author: Mark Hong
 '''
-import json, random
+import json
 import threading, Queue
+import os.path.getsize
 from sys import maxint
 from time import ctime, sleep
 from urllib2 import urlopen
@@ -28,6 +29,9 @@ class udp_ops_class:
 		self.skt.bind(('', port))
 		pass
 	
+	def data_getsize_op(self):
+		return -1
+
 	def data_read_op(self):
 		return self.skt.recv(4096)
 		pass
@@ -40,8 +44,12 @@ class file_ops_class:
 	"""docstring for file_ops_class"""
 	def __init__(self, url, length):
 		self.length = length
-		self.res = urlopen(url)
+		self.url = url
+		self.res = open(url, 'wb')
 		pass
+
+	def data_getsize_op(self):
+		return os.path.getsize(self.url)
 	
 	def data_read_op(self):
 		data = res.read(self.length)
@@ -58,6 +66,9 @@ class static_ops_class:
 		self.length = length
 		pass
 	
+	def data_getsize_op(self):
+		return len(self.data)
+
 	def data_read_op(self):
 		return zeroPadding(self.length, self.data)
 		pass
@@ -93,7 +104,7 @@ class StreamSource:
 		self.buffer = Queue()
 		# Cource Buffer Handle
 		self.data = self.src_map[src[0]](src[1], self.length)
-		self.sourceHandle = Thread(target=self.readThread, args=())
+		self.sourceHandle = threading.Thread(target=self.readThread, args=())
 		self.sourceHandle.setDaemon(True)
 		self.sourceHandle.start()
 		pass
@@ -104,7 +115,7 @@ class StreamSource:
 
 	def setLength(self, data):
 		self.length = int(data)
-		return False # Not reset
+		return True # Need reset
 
 	def setSource(self, cmd):
 		self.paused = True # pause read operation

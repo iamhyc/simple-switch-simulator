@@ -8,7 +8,7 @@ class Algorithm(Process):
 	"""
 	def __init__(self, queue):
 		Process.__init__(self)
-		self.fb_q, self.c2p_q = queue
+		self.fb_q, self.a2p_q = queue
 
 	def run(self):
 		try:

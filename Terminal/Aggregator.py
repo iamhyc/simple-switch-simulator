@@ -3,26 +3,63 @@
 Aggregator: for data flow manipulation
 @author: Mark Hong
 '''
-import json
-import socket
-import binascii, struct
-import Queue
+import socket, Queue
+import json, binascii, struct
 import threading, multiprocessing
-from time import ctime, sleep, time
-from optparse import OptionParser
 
 global frame_struct, ringBuffer
 global fb_skt, fb_port, redist_skt, redist_q
 global wifiRecvHandle, vlcRecvHandle, redistHandle
 
-class Aggregator(Thread):
+def cmd_parse(str):
+	cmd = ''
+	op_tuple = str.lower().split(' ')
+	op = op_tuple[0]
+	if len(op_tuple) > 1:
+		cmd = op_tuple[1:]
+		pass
+	return op, cmd
+	pass
+
+class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
 
 	"""
-	def __init__(self, arg):
+	def __init__(self, fb_port):
 		super(Aggregator, self).__init__()
 		self.numA = 0 #start sequence
 		self.numB = -1 #stop sequence
+		self.fb_port = fb_port
+		with open('../config.json') as cf:
+		 	self.config = json.load(cf)
+			pass
+		pass
+
+	def unpack_helper(self, fmt, data):
+	    size = struct.calcsize(fmt)
+	    return struct.unpack(fmt, data[:size]), data[size:]
+
+	def redistUDPThread(self, redist_q):
+		redist_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+		while not self.paused:
+			if not redist_q.empty():
+				data = redist_q.get_nowait()
+				#print('Redistributed Data: %s'%(data))
+				redist_skt.sendto(data, ('localhost', 12306))#redistribution
+			pass
+		pass
+
+	def redistFileThread(self, redist_q):
+		redist_fp = open(self.file_name, 'wb')
+
+		while not self.paused:
+			if not redist_q.empty():
+				data = redist_q.get_nowait()
+				#print('Redistributed Data: %s'%(data))
+				redist_fp.write(data)
+				pass
+			pass
 		pass
 
 	def process(self):
@@ -35,7 +72,7 @@ class Aggregator(Thread):
 		cnt, ptr = 0, 0
 		timeout = time() # packet time counter
 		while True:
-			ptr = (cnt % config['sWindow'])
+			ptr = (cnt % config['sWindow_rx'])
 			if time()-timeout < config['Atimeout']:
 				if ringBuffer[ptr][0] == cnt: #assume: writing not over reading
 					timeout = time() # subpacket time counter
@@ -50,7 +87,7 @@ class Aggregator(Thread):
 
 					timeout = time() # reset subpacket time counter
 					cnt += 1
-					ptr = (cnt % config['sWindow'])
+					ptr = (cnt % config['sWindow_rx'])
 					if sub_verified:
 						print(cnt)
 					else:
@@ -60,7 +97,7 @@ class Aggregator(Thread):
 			else: # packet loss
 				timeout = time() # reset packet time counter
 				cnt += 1
-				ptr = (cnt % config['sWindow'])
+				ptr = (cnt % config['sWindow_rx'])
 				print("Packet %d loss."%(cnt))
 				pass
 			pass
@@ -70,31 +107,6 @@ class Aggregator(Thread):
 		
 		pass
 
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]
-		pass
-	return op, cmd
-	pass
-
-def unpack_helper(fmt, data):
-    size = struct.calcsize(fmt)
-    return struct.unpack(fmt, data[:size]), data[size:]
-
-def redistThread(redist_q):
-	redist_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-	while True:
-		if not redist_q.empty():
-			data = redist_q.get_nowait()
-			#print('Redistributed Data: %s'%(data))
-			redist_skt.sendto(data, ('localhost', 12306))#redistribution
-		sleep(0) #surrender turn
-		pass
-	pass
 
 def RecvThread(name, port, config):
 	global ringBuffer
@@ -106,7 +118,7 @@ def RecvThread(name, port, config):
 		(Seq, Size, Offset, CRC), Data = unpack_helper(config['struct'], raw)
 		#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
 
-		ptr = Seq % config['sWindow']
+		ptr = Seq % config['sWindow_rx']
 		if ringBuffer[ptr][0] != Seq:
 			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
 			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
@@ -131,8 +143,8 @@ def agg_init():
 	frame_struct = struct.Struct('IHH') #Or, Struct('IB')	
 	# RingBuffer Init
 	# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
-	ringBuffer = [0] * config['sWindow']
-	for x in xrange(config['sWindow']):
+	ringBuffer = [0] * config['sWindow_rx']
+	for x in xrange(config['sWindow_rx']):
 		ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
 		pass
 	redist_q = Queue.Queue()

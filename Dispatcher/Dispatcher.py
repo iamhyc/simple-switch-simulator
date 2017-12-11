@@ -14,10 +14,13 @@ from Algorithm import Algorithm
 global config
 global proc_map, proc_remap
 global ClientCount
-global alg_node, fb_q, c2p_q
+global alg_node, fb_q, a2p_q
 
 ALLOC_PORT_BASE = 20000
 
+'''
+Process Helper Function
+'''
 def cmd_parse(str):
 	cmd = ''
 	op_tuple = str.lower().split(' ')
@@ -51,6 +54,22 @@ def request(frame, sock, timeout=None):
 		return False
 	pass
 
+def exec_nowait(task_id, cmd):
+	proc_map[task_id]['queue'][1].queue.clear()
+	proc_map[task_id]['queue'][0].put_nowait(cmd)
+	pass
+
+def exec_wait(task_id, cmd):
+	proc_map[task_id]['queue'][1].queue.clear()
+	proc_map[task_id]['queue'][0].put_nowait(cmd)
+	while proc_map[task_id]['queue'][1].empty():
+		pass
+	return proc_map[task_id]['queue'][1].get_nowait()
+	pass
+
+'''
+Process Command Function
+'''
 def process_print(cmd, sock, addr):
 	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
 	response(True, sock, proc_list)
@@ -64,12 +83,13 @@ def register_client(cmd, sock, addr):
 	port = ALLOC_PORT_BASE + ClientCount #allocate port nubmer
 
 	p2c_q = Queue() #Parent to Child Queue
+	c2p_q = Queue() #Child to Parent Queue
 
 	proc_remap[wifi_ip] = task_id #revese map over Wi-Fi link
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
 	proc_map[task_id]['res_sock'] = sock
-	proc_map[task_id]['queue'] = (p2c_q, fb_q)
+	proc_map[task_id]['queue'] = (p2c_q, c2p_q, fb_q)
 	proc_map[task_id]['_thread'] = Distributor(
 									task_id,
 									proc_map[task_id]['char'], 
@@ -102,11 +122,15 @@ def remove_client(cmd, sock, addr):
 	pass
 
 def set_source(cmd, sock, addr):
-	task_id = proc_remap[addr] if cmd[0] <= -1 else cmd[0] #-1 for no id
+	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = ''.join(['src'] + cmd[1:])
-		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
-		request('src-now', proc_map[task_id]['req_sock']) # notify Terminal side
+
+		res = exec_wait(task_id, p2c_cmd)
+		status, pkt_number = cmd_parse(res)
+		
+		req_cmd = ' '.join('src-now', pkt_number)
+		request(req_cmd, proc_map[task_id]['req_sock']) # notify Terminal side
 		response(True, sock) # to Controller Side
 		pass
 	else:
@@ -115,10 +139,10 @@ def set_source(cmd, sock, addr):
 	pass
 
 def start_source(cmd, sock, addr):
-	task_id = proc_remap[addr] if cmd[0] <= -1 else cmd[0] #-1 for no id
+	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = 'src-now'
-		proc_map[task_id]['queue'][0].put_nowait(p2c_cmd)
+		res = exec_wait(task_id, p2c_cmd)
 		response(True, sock)
 		pass
 	else:
@@ -130,8 +154,11 @@ def idle_work(cmd, sock, addr):
 	response(True, sock)
 	pass
 
+'''
+Process Internal Function
+'''
 def disp_init():
-	global skt, fb_q, c2p_q, alg_node, ClientCount, proc_map, proc_remap, ops_map
+	global skt, fb_q, a2p_q, alg_node, ClientCount, proc_map, proc_remap, ops_map
 
 	# Map Init
 	proc_map = {}
@@ -153,8 +180,8 @@ def disp_init():
 	# plugin Alg. Node Init 
 	ClientCount = 0
 	fb_q = Queue()
-	c2p_q = Queue()
-	alg_node = Algorithm((fb_q, c2p_q))
+	a2p_q = Queue()
+	alg_node = Algorithm((fb_q, a2p_q))
 	alg_node.daemon = True #set as daemon process
 	alg_node.start()
 	pass

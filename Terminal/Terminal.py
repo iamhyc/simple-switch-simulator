@@ -73,7 +73,10 @@ def term_init():
 	t = Thread(target=tcplink, args=(sock, addr))
     t.start()
 	
-	processor = Aggregator(fb_port)
+	p2c_q = multiprocessing.Queue() #Parent to Child Queue
+	c2p_q = multiprocessing.Queue() #Child to Parent Queue
+	queue = (p2c_q, c2p_q)
+	processor = Aggregator(queue, fb_port)
 	print('Connected with uplink port %d.'%(fb_port))
 	pass
 

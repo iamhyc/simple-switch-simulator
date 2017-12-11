@@ -13,12 +13,22 @@ import crcmod.predefined
 
 from StreamSource import StreamSource
 
+def cmd_parse(str):
+	cmd = ''
+	op_tuple = str.lower().split(' ', 1)
+	op = op_tuple[0]
+	if len(op_tuple) > 1:
+		cmd = op_tuple[1:]
+		pass
+	return op, cmd
+
 class QueueCoder:
 	"""docstring for QueueCoder"""
-	def __init__(self, tuple_q, ratio_list):
+	def __init__(self, tuple_q, ratio_list, sWindow):
 		self.tuple_q = tuple(tuple_q)
 		self.splitter = list(ratio_list)
 		self.number = len(tuple_q)
+		self.win_size = sWindow
 		self.count = 0
 		self.crcGen = crcmod.predefined.Crc('crc-16')
 		#Seq[4B] + Size[2B] + Offset[2B] + CRC16[2B] + Data
@@ -27,6 +37,8 @@ class QueueCoder:
 		self.buffer = ctypes.create_string_buffer(self.frame.size)
 		self.crcFrame = struct.Struct('IHH')
 		self.crcBuffer = ctypes.create_string_buffer(self.crcFrame.size)
+		#(ring)Buffer Array as tx sliding window
+		self.tx_window = [[chr(0)] * self.number] * sWindow
 		pass
 
 	def setRatio(self, ratio):
@@ -96,7 +108,7 @@ class Distributor(Process):
 		Process.__init__(self)
 		self.config = {}
 		self.task_id = task_id
-		self.p2c_q, self.fb_q = queue
+		self.p2c_q, self.c2p_q, self.fb_q = queue
 		self.wifi_ip, self.vlc_ip, self.fb_port = char
 		with open('../config.json') as cf:
 		 	self.config = json.load(cf)
@@ -115,7 +127,8 @@ class Distributor(Process):
 		self.vlc_q = Queue()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
-			(0.0,			1.0)
+			(0.0,			1.0),
+			config['sWindow_rx']
 		)
 
 		#5 Operation Map Driver
@@ -126,15 +139,6 @@ class Distributor(Process):
 			"ratio":self.encoder.setRatio,
 		}
 		pass
-	
-	def cmd_parse(self, str):
-		cmd = ''
-		op_tuple = str.lower().split(' ', 1)
-		op = op_tuple[0]
-		if len(op_tuple) > 1:
-			cmd = op_tuple[1:]
-			pass
-		return op, cmd
 
 	def setValue(self, tuple):
 		pass
@@ -147,6 +151,7 @@ class Distributor(Process):
 	def configSource(self, cmd):
 		if self.src.config(cmd): #True for Restart
 			self.encoder.clearAll()
+		self.c2p_q.put_nowait('1')
 		pass
 
 	def dist_start(self):
