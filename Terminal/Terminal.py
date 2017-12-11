@@ -79,10 +79,8 @@ def start_recv_op(cmd, sock):
 	cmd = ['set'] + cmd + [src_type]
 
 	processor.stop()
-	exec_wait(cmd)
-		#processor.hashName = fhash
-		#processor.size = int(fsize)
-		#processor.total = math.ceil(fsize / float(flength))
+	res = exec_wait(cmd)
+
 	processor.start()
 	response(True, sock)
 	pass
@@ -118,7 +116,7 @@ def term_exit():
 def term_init():
 	global skt_req, skt_res, processor, p2c_q, c2p_q, ops_map, src_type
 
-	src_type = 's' #'r' for relay, 'c' for cache
+	src_type = 'r' #'r' for relay, 'c' for cache
 	ops_map = {
 		# General Operation
 		"ls":status_print_op,
