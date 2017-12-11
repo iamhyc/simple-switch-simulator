@@ -65,10 +65,8 @@ def exec_wait(task_id, cmd):
 	while not proc_map[task_id]['queue'][1].empty():
 		proc_map[task_id]['queue'][1].get()
 		pass
-	proc_map[task_id]['queue'][0].put_nowait(cmd)
-	while proc_map[task_id]['queue'][1].empty():
-		pass
-	return proc_map[task_id]['queue'][1].get_nowait()
+	proc_map[task_id]['queue'][0].put(cmd)
+	return proc_map[task_id]['queue'][1].get()
 	pass
 
 '''
@@ -131,10 +129,9 @@ def set_source_op(cmd, sock, addr):
 		p2c_cmd = ''.join(['src'] + cmd[1:])
 
 		res = exec_wait(task_id, p2c_cmd)
-		status, pkt_number = cmd_parse(res)
-		
-		req_cmd = ' '.join('src-now', pkt_number)
-		request(req_cmd, proc_map[task_id]['req_sock']) # notify Terminal side
+		if res[0]=='+': # need notify Terminal side
+			request(res[1:], proc_map[task_id]['req_sock'])
+			pass
 		response(True, sock) # to Controller Side
 		pass
 	else:

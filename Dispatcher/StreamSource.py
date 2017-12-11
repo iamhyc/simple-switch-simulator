@@ -3,7 +3,7 @@
 Source: Data Flow Source
 @author: Mark Hong
 '''
-import json, math
+import json
 import threading, Queue
 import os.path.getsize
 from sys import maxint
@@ -23,14 +23,18 @@ def zeroPadding(length, data):
 class udp_ops_class:
 	"""docstring for udp_ops_class"""
 	def __init__(self, port, length):
+		port = int(port)
 		self.skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.skt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
 		#self.skt.setblocking(0)
 		self.skt.bind(('', port))
 		pass
 	
+	def data_gethash_op(self):
+		return hash(self.url)
+
 	def data_getsize_op(self):
-		return -1
+		return (-1)*self.length
 
 	def data_read_op(self):
 		return self.skt.recv(4096)
@@ -48,9 +52,11 @@ class file_ops_class:
 		self.res = open(url, 'wb')
 		pass
 
+	def data_gethash_op(self):
+		return hash(self.url)
+
 	def data_getsize_op(self):
-		size = float(os.path.getsize(self.url))
-		return math.ceil(size/self.length)
+		return os.path.getsize(self.url)
 	
 	def data_read_op(self):
 		data = res.read(self.length)
@@ -67,8 +73,11 @@ class static_ops_class:
 		self.length = length
 		pass
 	
+	def data_gethash_op(self):
+		return hash(self.data)
+
 	def data_getsize_op(self):
-		return -1
+		return len(data)
 
 	def data_read_op(self):
 		return zeroPadding(self.length, self.data)
@@ -110,6 +119,12 @@ class StreamSource:
 		self.sourceHandle.start()
 		pass
 
+	'''
+	SET Operation Function
+	'''
+	def config(self, cmd):
+		return self.ops_map[cmd[0]](cmd[1])
+
 	def setSpeed(self, data):
 		self.speed = float(data)
 		return False # Not reset
@@ -119,23 +134,24 @@ class StreamSource:
 		return True # Need reset
 
 	def setSource(self, cmd):
-		self.paused = True # pause read operation
+		self.stop() # stop read thread
 		self.data.data_close_op() # close previous source
 		self.buffer.queue.clear() # clear previous buffer
 
 		self.data = self.src_map[cmd[0]](cmd[1], self.length)
-		#self.paused = False # Disable auto-start
 		return True # need reset
 
-	def config(self, cmd):
-		return self.ops_map[cmd[0]](cmd[1])
-
-	def pause(self, status):
-		self.paused = status
+	'''
+	DataSource Related Function
+	'''
+	def start(self):
+		self.paused = False
+		self.sourceHandle.start()
 		pass
 
-	def isPaused(self):
-		return self.paused
+	def stop(self):
+		self.paused = True
+		pass
 
 	def empty(self):
 		return self.buffer.empty()

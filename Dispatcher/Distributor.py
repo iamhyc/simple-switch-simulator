@@ -154,41 +154,46 @@ class Distributor(Process):
 			"src":self.configSource,
 			"src-now":self.triggerSource,
 			"set":self.setValue,
-			"ratio":self.encoder.setRatio,
+			"ratio":self.setRatio,
 		}
 		pass
 
+	'''
+	Process Helper Function
+	'''
+	def response(self, status, frame=''):
+		if status:
+			data = '+'
+		else:
+			data = '-'
+
+		self.c2p_q.put_nowait(data + frame)
+		return True
+
+	def setRatio(self, ratio):
+		self.encoder.setRatio(ratio)
+		return self.response(True)
+
 	def setValue(self, tuple):
-		pass
+		return self.response(True)
 
 	def triggerSource(self, cmd):
-		self.src.pause(False)
-		self.src.sourceHandle.start()
-		pass
+		self.src.start()
+		return self.response(True)
 
 	def configSource(self, cmd):
 		if self.src.config(cmd): #True for Restart
 			self.encoder.clearAll()
-		self.c2p_q.put_nowait('1')
-		pass
+			fhash = self.src.data.data_gethash_op()
+			fsize = self.src.data.data_getsize_op()
+			flength = self.src.length
+			frame = 'src-now %d %d %d'%(fhash, fsize, flength)
+			return self.response(True, frame)
+		return self.response(False)
 
-	def dist_start(self):
-		#init feedback link --> non-blocking check
-		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
-		#init transmission link --> idle
-		thread.start_new_thread(self.vlcXmitThread, (self.config['stream_vlc_port_tx'], ))
-		thread.start_new_thread(self.wifiXmitThread, (self.config['stream_wifi_port'], ))
-		#init data source --> busy
-		thread.start_new_thread(self.distXmitThread,())
-		pass
-
-	def dist_stop(self):
-		#close socket here
-		#terminate thread here
-		print("<%s-%d> now exit..."%("Client", self.task_id))
-		exit()
-		pass
-
+	'''
+	Process Thread Function
+	'''
 	def uplinkThread(self):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		fb_skt.setblocking(0) #Non-blocking Socket
@@ -237,6 +242,26 @@ class Distributor(Process):
 				#print('To Wi-Fi link: %s'%(data))
 				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
 				pass
+		pass
+
+	'''
+	Process Entrance Function
+	'''
+	def dist_start(self):
+		#init feedback link --> non-blocking check
+		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
+		#init transmission link --> idle
+		thread.start_new_thread(self.vlcXmitThread, (self.config['stream_vlc_port_tx'], ))
+		thread.start_new_thread(self.wifiXmitThread, (self.config['stream_wifi_port'], ))
+		#init data source --> busy
+		thread.start_new_thread(self.distXmitThread,())
+		pass
+
+	def dist_stop(self):
+		#close socket here
+		#terminate thread here
+		print("<%s-%d> now exit..."%("Client", self.task_id))
+		exit()
 		pass
 
 	def run(self):
