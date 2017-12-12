@@ -20,10 +20,17 @@ And a cache node controller based on Content-request service (P/S struct).
 
 ## Console on Terminal Side
 
-|  TYPE   |  PARAM1   | PARAM2 | PARAM3 | PARAM4 |
-| :-----: | :-------: | :----: | :----: | :----: |
-| SRC-NOW | HASH_NAME |  SIZE  | LENGTH |        |
-|         |           |        |        |        |
-|         |           |        |        |        |
-|         |           |        |        |        |
+|   TYPE   |  PARAM1   | PARAM2 | PARAM3 | PARAM4 |
+| :------: | :-------: | :----: | :----: | :----: |
+| SRC-NOW  | HASH_NAME |  SIZE  | LENGTH |        |
+|    LS    |           |        |        |        |
+| SRC-TYPE |   TYPE    |        |        |        |
+|   IDLE   |           |        |        |        |
+
+## Terminal Type
+
+|                      | STREAM REDIST | CONTENT REDIST |
+| :------------------: | :-----------: | :------------: |
+|  **FINITE COUNTER**  |     relay     |    *cache*     |
+| **INFINITE COUNTER** |     relay     |   non-sense    |
 

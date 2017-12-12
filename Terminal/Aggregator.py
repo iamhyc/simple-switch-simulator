@@ -6,9 +6,8 @@ Aggregator: for data flow manipulation
 import socket, Queue
 import json, binascii, struct
 import threading, multiprocessing
-
-global fb_skt, fb_port, redist_skt, redist_q
-global wifiRecvHandle, vlcRecvHandle, redistHandle
+from sys import maxint
+from time import ctime, sleep, time
 
 def cmd_parse(str):
 	cmd = ''
@@ -20,6 +19,13 @@ def cmd_parse(str):
 	return op, cmd
 	pass
 
+def build_frame(status, frame=''):
+	if status:
+		data = '+'
+	else:
+		data = '-'
+	return (data + frame)
+
 def unpack_helper(fmt, data):
 	    size = struct.calcsize(fmt)
 	    return struct.unpack(fmt, data[:size]), data[size:]
@@ -28,14 +34,14 @@ class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
 
 	"""
-	def __init__(self, queue, fb_port):
+	def __init__(self, queue, fb_tuple):
 		super(Aggregator, self).__init__()
 		self.numA = 0#beginSequence
 		self.numB = -1#endSequence
 		self.redist_paused = True
 		self.proc_paused = True
 		self.p2c_q, self.c2p_q = queue
-		self.fb_port = fb_port
+		self.fb_tuple = fb_tuple
 		self.src_type = 'r' #default for stream
 		self.ops_map = {
 			'set':self.setParam,
@@ -48,45 +54,106 @@ class Aggregator(multiprocessing.Process):
 		# RingBuffer Init
 		# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
 		self.ringBuffer = [0] * self.config['sWindow_rx']
+		init_ringbuffer()
+
+		# feedback init
+		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
+		self.redist_q = Queue.Queue()
+		self.fb_q = Queue.Queue()
+		
+		#Thread Handle Init
+		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, args=('Wi-Fi', self.config['stream_wifi_port']))
+		self.wifiRecvHandle.setDaemon(True)
+
+		self.vlcRecvHandle = threading.Thread(target=self.RecvThread, args=('VLC', self.config['stream_vlc_port_rx']))
+		self.vlcRecvHandle.setDaemon(True)
+
+		self.redistFileHandle = threading.Thread(target=self.redistFileThread, args=(self.redist_q, ))
+		self.redistFileHandle.setDaemon(True)
+
+		self.redistUDPHandle = threading.Thread(target=self.redistUDPThread, args=(self.redist_q, ))
+		self.redistUDPHandle.setDaemon(True)
+
+		self.uplinkHandle = threading.Thread(target=self.uplinkThread, args=(self.fb_q, ))
+		self.uplinkHandle.setDaemon(True)
+		self.procHandle = threading.Thread(target=self.processThread, args=())
+		self.procHandle.setDaemon(True)
+		pass
+
+	def init_ringbuffer(self):
 		for x in xrange(self.config['sWindow_rx']):
 			self.ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
 			pass
-		
-		#Thread Handle Init
-		self.redist_q = Queue.Queue()
-		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		self.wifiRecvHandle = Thread(target=self.RecvThread, args=('Wi-Fi', self.config['stream_wifi_port']))
-		self.vlcRecvHandle = Thread(target=self.RecvThread, args=('VLC', self.config['stream_vlc_port_rx']))
-		self.redistFileHandle = Thread(target=redistFileThread, args=(redist_q, ))
-		self.redistUDPHandle = Thread(target=redistUDPThread, args=(redist_q, ))
-		self.wifiRecvHandle.setDaemon(True)
-		self.vlcRecvHandle.setDaemon(True)
-		self.redistFileHandle.setDaemon(True)
-		self.redistUDPHandle.setDaemon(True)
 		pass
 
 	'''
 	Process Helper Function
 	'''
 	def response(self, status, frame=''):
-		if status:
-			data = '+'
-		else:
-			data = '-'
+		frame = build_frame(status, frame)
 
 		self.c2p_q.put_nowait(data + frame)
 		return True
 
 	def setParam(self, cmd):
+		proc_stop()
+		redist_stop()
+
 		self.fhash, fsize, flength, self.src_type = cmd
 		self.size = int(fsize)
-		self.numB = math.ceil(fsize / float(flength))
+		flength = float(flength)
+
+		self.numB = math.ceil(fsize / flength) - 1
+		if self.numB<0:
+			self.numB = maxint
+			pass
+
+		#self.remains = self.size - self.numB*flength #zeros in last packet
+		
+		redist_start()
+		proc_start()
 		response(True)
 		pass
 
 	def setType(self, src_type):
 		self.src_type = src_type
 		response(True)
+		pass
+
+	def redist_stop(self):
+		self.redist_paused = True
+		self.redist_q.queue.clear()
+		pass
+
+	def redist_start(self):
+		self.redist_paused = False
+		if self.src_type=='r':
+			self.redistUDPThread.start()
+		else:
+			self.redistFileHandle.start()
+		pass
+
+	def proc_stop(self):
+		self.proc_paused = True
+		self.init_ringbuffer()
+		pass
+
+	def proc_start(self):
+		self.proc_paused = False
+		self.wifiRecvHandle.start()
+		self.vlcRecvHandle.start()
+		if not self.src_type=='r':
+			self.procHandle.start()
+		pass
+
+	'''
+	Process Thread Function
+	'''
+	def uplinkThread(self, fb_q):
+		while not fb_q.empty:
+			frame = fb_q.get_nowait()
+			self.fb_skt.sendto(frame, self.fb_tuple)
+			pass
 		pass
 
 	def redistUDPThread(self, redist_q):
@@ -96,60 +163,68 @@ class Aggregator(multiprocessing.Process):
 			if not redist_q.empty():
 				data = redist_q.get_nowait()
 				#print('Redistributed Data: %s'%(data))
-				redist_skt.sendto(data, ('localhost', 12306))#redistribution
+				redist_skt.sendto(data, ('localhost', self.config['content_client_port']))#redistribution
 			pass
 		pass
 
 	def redistFileThread(self, redist_q):
-		redist_fp = open(self.file_name, 'wb')
+		redist_fp = open(self.fhash, 'r+b')
+		#redist_fp.fillin(chr(0), self.size) #not needed
 
-		while not self.redist_paused:
-			if not redist_q.empty():
-				data = redist_q.get_nowait()
+		seq_map = [0] * self.numB
+		ptr, tot = 0, 2*self.numB
+
+		while not self.redist_paused and tot>0:
+			
+			while not redist_q.empty():
+				raw = redist_q.get_nowait()
+				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
 				#print('Redistributed Data: %s'%(data))
-				redist_fp
-				redist_fp.write(data)
+				redist_fp.seek(Seq*Size + Offset)
+				redist_fp.write(Data)
+
+				if seq_map[Seq] < 2:
+					seq_map[Seq] += 1
+					tot -=1
+					pass
 				pass
+
+			while ptr <= self.numB and seq_map[ptr]==2: ptr = (ptr+1) % (self.numB+1)
+			self.fb_q.put_nowait(build_frame(False, ptr)) #retransmission
+			sleep(0.05) #wait for transmission
 			pass
+		
+		redist_fp.truncate(self.size) #remove extra zeros
+		redist_fp.close()
 		pass
 
 	def RecvThread(self, name, port):
 		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		recv_skt.bind(('', port))
 
-		while True:
+		while self.proc_paused:
 			raw, addr = recv_skt.recvfrom(4096)
-			(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
-			#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
 
-			ptr = Seq % self.config['sWindow_rx']
-			if ringBuffer[ptr][0] != Seq:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+			if self.src_type=='r':
+				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
+				#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
+				ptr = Seq % self.config['sWindow_rx']
+				if ringBuffer[ptr][0] != Seq:
+					ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+					ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+					pass
+				else:
+					ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+					ringBuffer[ptr][1] -= len(Data)
+					pass
 				pass
-			else:
-				ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
-				ringBuffer[ptr][1] -= len(Data)
+			else: #src_type=='c'
+				self.redist_q.put_nowait(raw)
 				pass
-			#statistical collection here
-	    	#print(os.getpid())
-	    	sleep(0) #surrender turn
+			pass
 		pass
 
-	def recvStart():
-		if self.src_type=='c':#cache type
-			redistFileThread.start()
-		else:
-			redistUDPHandle.start()
-
-		redistHandle.start()
-		wifiRecvHandle.start()
-		vlcRecvHandle.start()
-		pass
-
-	def process(self):
-		recvStart()
-		# should with start and end seq
+	def processThread(self): #for relay only
 		while ringBuffer[0][0] != self.numA:
 			sleep(0.1) # wait
 			pass

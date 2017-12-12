@@ -8,7 +8,6 @@ from Aggregator import Aggregator
 
 import json, math
 import socket, string, binascii
-from time import ctime, sleep, time
 from threading import Thread
 from multiprocessing import Process, Queue
 from optparse import OptionParser
@@ -77,15 +76,13 @@ def start_recv_op(cmd, sock):
 	# false exists here
 	fhash, fsize, flength = cmd
 	cmd = ['set'] + cmd + [src_type]
-
-	processor.stop()
 	res = exec_wait(cmd)
 
-	processor.start()
 	response(True, sock)
 	pass
 
 def set_recv_type_op(cmd, sock):
+	cmd = ['type'] + [cmd[0]]
 	response(True, sock)
 	pass
 
@@ -143,7 +140,7 @@ def term_init():
 	p2c_q = multiprocessing.Queue() #Parent to Child Queue
 	c2p_q = multiprocessing.Queue() #Child to Parent Queue
 	queue = (p2c_q, c2p_q)
-	processor = Aggregator(queue, fb_port)
+	processor = Aggregator(queue, (options.server,fb_port))
 	processor.daemon = True
 
 	# Run NOW
