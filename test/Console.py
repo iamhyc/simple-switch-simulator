@@ -30,10 +30,10 @@ def helper():
 
 def cmd_parse(str):
 	cmd = ''
-	op_tuple = str.lower().split(' ', 1)
+	op_tuple = str.lower().split(' ')
 	op = op_tuple[0]
 	if len(op_tuple) > 1:
-		cmd = op_tuple[1].split(' ')
+		cmd = op_tuple[1:]	
 		pass
 	return op, cmd
 	pass
@@ -62,8 +62,8 @@ def main():
 				helper()
 				pass
 			elif op=='add' and len(cmd)>=2:
-				#'<command> <ip1>;<ip2>'
-				tmp = ('%s %s;%s'%('add', cmd[0], cmd[1]))
+				#'<command> <ip1> <ip2>'
+				tmp = ('%s %s %s'%('add', cmd[0], cmd[1]))
 				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
 				data, ADDR = skt_recv.recvfrom(1024) #receive port allocation
 				print(tmp)

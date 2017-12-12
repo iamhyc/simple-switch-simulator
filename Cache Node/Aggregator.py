@@ -9,11 +9,11 @@ import json
 import socket
 import binascii, struct
 import Queue
-from threading import Thread, Lock
-from time import ctime, sleep
+from threading import Thread
+from time import ctime, sleep, time
 from optparse import OptionParser
 
-global ringBuffer, rb_lock
+global ringBuffer
 global config, options
 global frame_struct, ringBuffer
 global fb_skt, fb_port, redist_skt, redist_q
@@ -47,14 +47,12 @@ def wifiRecvThread(config):
 
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with rb_lock:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
 			pass
 		else:
-			with rb_lock:
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
-				ringBuffer[ptr][1] -= len(Data)
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+			ringBuffer[ptr][1] -= len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -73,14 +71,12 @@ def vlcRecvThread(config):
 		
 		ptr = Seq % config['sWindow']
 		if ringBuffer[ptr][0] != Seq:
-			with rb_lock:
-				ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
+			ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
 			pass
 		else:
-			with rb_lock:
-				ringBuffer[ptr][2][Offset:Offset+Size] = Data
-				ringBuffer[ptr][1] -= len(Data)
+			ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+			ringBuffer[ptr][1] -= len(Data)
 			pass
 		#statistical collection here
     	#print(os.getpid())
@@ -88,9 +84,8 @@ def vlcRecvThread(config):
 	pass
 
 def recvStart():
-	global ringBuffer, rb_lock, config
+	global ringBuffer, config
 	
-	rb_lock = Lock()
 	wifiRecvHandle = Thread(target=wifiRecvThread, args=(config, ))
 	vlcRecvHandle = Thread(target=vlcRecvThread, args=(config, ))
 	redistHandle = Thread(target=redistThread, args=(redist_q, ))
@@ -106,7 +101,11 @@ def recvStart():
 def agg_init():
 	global config, ringBuffer, redist_q, fb_port, fb_skt
 
-	ringBuffer = ([[-1, -1, []]] * config['sWindow'])
+	# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
+	ringBuffer = [0] * config['sWindow']
+	for x in xrange(config['sWindow']):
+		ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
+		pass
 	redist_q = Queue.Queue()
 	
 	req_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -133,23 +132,42 @@ def agg_exit():
 def main():
 	agg_init()
 	recvStart()
+	
+	while ringBuffer[0][0] != 0:
+		sleep(0.1) # wait
+		pass
 
-	cnt = 0
+	cnt, ptr = 0, 0
+	timeout = time() # packet time counter
 	while True:
 		ptr = (cnt % config['sWindow'])
-		if ringBuffer[ptr][0]  == cnt: #assume: writing not over reading
-			counter = 0
-			while ringBuffer[ptr][1]!= 0 and counter < config['timeout']:
-				counter += 1
+		if time()-timeout < config['Atimeout']:
+			if ringBuffer[ptr][0] == cnt: #assume: writing not over reading
+				timeout = time() # subpacket time counter
 
-			if counter <= config['timeout']:
-				redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+				sub_verified = False
+				while time()-timeout < config['Btimeout']:
+					if ringBuffer[ptr][1] == 0:
+						redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+						sub_verified = True
+						break
+					pass
+
+				timeout = time() # reset subpacket time counter
+				cnt += 1
+				ptr = (cnt % config['sWindow'])
+				if sub_verified:
+					print(cnt)
+				else:
+					print("subPacket loss in %d."%(cnt))
 				pass
-
-			cnt += 1
-			print(cnt)
 			pass
-		sleep(0) #surrender turn
+		else: # packet loss
+			timeout = time() # reset packet time counter
+			cnt += 1
+			ptr = (cnt % config['sWindow'])
+			print("Packet %d loss."%(cnt))
+			pass
 		pass
 	pass
 
@@ -163,14 +181,19 @@ if __name__ == '__main__':
 	parser.add_option("-s", "--server",
 		dest="server", 
 		default="localhost", 
-		help="Designate the dispatcher server") 
+		help="Designate the dispatcher server")
+	parser.add_option("-w", "--wifi",
+		dest="wifi", 
+		default="localhost", 
+		help="Designate the Wi-Fi interface")
+	parser.add_option("-v", "--vlc",
+		dest="vlc", 
+		default="localhost", 
+		help="Designate the VLC interface")
 	(options, args) = parser.parse_args()
 
 	frame_struct = struct.Struct('Ihhs') #Or, Struct('IBs')
-	local_wifi_ip = "localhost"
-	local_vlc_proxy_ip = "localhost"
-	local_vlc_real_ip = "localhost"#bind to the relay ip
-	init_cmd = ('%s %s;%s'%('add', local_wifi_ip, local_vlc_proxy_ip))
+	init_cmd = ('%s %s %s'%('add', options.wifi, options.vlc))
 
 	try: #cope with Interrupt Signal
 		main()

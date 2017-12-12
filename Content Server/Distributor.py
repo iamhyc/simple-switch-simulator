@@ -93,7 +93,7 @@ class Distributor(Process):
 		self.vlc_q = Queue()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
-			(1.0,			0.0)
+			(0.5,			0.5)
 		)
 		#4 Operation Map Driver
 		self.ops_map = {
@@ -107,7 +107,7 @@ class Distributor(Process):
 		op_tuple = str.lower().split(' ', 1)
 		op = op_tuple[0]
 		if len(op_tuple) > 1:
-			cmd = op_tuple[1]
+			cmd = op_tuple[1:]
 			pass
 		return op, cmd
 
