@@ -19,12 +19,16 @@ def cmd_parse(str):
 	return op, cmd
 	pass
 
-def build_frame(status, frame=''):
+def build_frame(status, ftype='', fdata=''):
 	if status:
-		data = '+'
+		status = '+'
 	else:
-		data = '-'
-	return (data + frame)
+		status = '-'
+	
+	if ftype:
+		return "%s%s %s"%(status, ftype, fdata)
+	else:
+		return "%s%s"%(status, fdata)
 
 def unpack_helper(fmt, data):
 	    size = struct.calcsize(fmt)
@@ -62,10 +66,10 @@ class Aggregator(multiprocessing.Process):
 		self.fb_q = Queue.Queue()
 		
 		#Thread Handle Init
-		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, args=('Wi-Fi', self.config['stream_wifi_port']))
+		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, args=('wifi', self.config['stream_wifi_port']))
 		self.wifiRecvHandle.setDaemon(True)
 
-		self.vlcRecvHandle = threading.Thread(target=self.RecvThread, args=('VLC', self.config['stream_vlc_port_rx']))
+		self.vlcRecvHandle = threading.Thread(target=self.RecvThread, args=('vlc', self.config['stream_vlc_port_rx']))
 		self.vlcRecvHandle.setDaemon(True)
 
 		self.redistFileHandle = threading.Thread(target=self.redistFileThread, args=(self.redist_q, ))
@@ -89,11 +93,15 @@ class Aggregator(multiprocessing.Process):
 	'''
 	Process Helper Function
 	'''
-	def response(self, status, frame=''):
-		frame = build_frame(status, frame)
-
-		self.c2p_q.put_nowait(data + frame)
+	def response(self, status, ftype='', fdata=''):
+		frame = build_frame(status, ftype, fdata)
+		self.c2p_q.put_nowait(frame)
 		return True
+
+	def feedback(self, status, ftype='', fdata=''):
+		frame = build_frame(status, ftype, fdata)
+		self.fb_q.put_nowait(frame)
+		pass
 
 	def setParam(self, cmd):
 		proc_stop()
@@ -190,7 +198,7 @@ class Aggregator(multiprocessing.Process):
 				pass
 
 			while ptr <= self.numB and seq_map[ptr]==2: ptr = (ptr+1) % (self.numB+1)
-			self.fb_q.put_nowait(build_frame(False, ptr)) #retransmission
+			feedback(False, fdata=ptr) #retransmission
 			sleep(0.05) #wait for transmission
 			pass
 		
@@ -203,24 +211,29 @@ class Aggregator(multiprocessing.Process):
 		recv_skt.bind(('', port))
 
 		while self.proc_paused:
+			last_time = time()
 			raw, addr = recv_skt.recvfrom(4096)
 
 			if self.src_type=='r':
 				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
+				data_len = len(Data)
 				#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
 				ptr = Seq % self.config['sWindow_rx']
 				if ringBuffer[ptr][0] != Seq:
-					ringBuffer[ptr] = [Seq, Size - len(Data), [chr(0)]*Size]
-					ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
+					ringBuffer[ptr] = [Seq, Size - data_len, [chr(0)]*Size]
+					ringBuffer[ptr][2][Offset:Offset+data_len] = Data
 					pass
 				else:
-					ringBuffer[ptr][2][Offset:Offset+len(Data)] = Data
-					ringBuffer[ptr][1] -= len(Data)
+					ringBuffer[ptr][2][Offset:Offset+data_len] = Data
+					ringBuffer[ptr][1] -= data_len
 					pass
 				pass
 			else: #src_type=='c'
 				self.redist_q.put_nowait(raw)
 				pass
+
+			rate_inst = data_len / time() - last_time
+			feedback(True, name, '%d'%(rate_inst))
 			pass
 		pass
 

@@ -159,7 +159,7 @@ def idle_work_op(cmd, sock, addr):
 Process Internal Function
 '''
 def disp_init():
-	global skt, fb_q, a2p_q, alg_node, ClientCount, proc_map, proc_remap, ops_map
+	global skt, fb_q, a2p_q, alg_node, ClientCount, proc_map, proc_remap, ops_map, fbHandle
 
 	# Map Init
 	proc_map = {}
@@ -185,11 +185,26 @@ def disp_init():
 	alg_node = Algorithm((fb_q, a2p_q))
 	alg_node.daemon = True #set as daemon process
 	alg_node.start()
+	# plugin Alg. Node feedback
+	fbHandle = Thread(target=fbThread, args=(fb_q, ))
+	fbHandle.setDaemon(True)
+	fbHandle.start()
 	pass
 
 def disp_exit():
 	alg_node.terminate()
 	exit()
+	pass
+
+def fbThread(fb_q):
+	while True:
+		if not fb_q.empty():
+			frame = fb_q.get_nowait()
+			op, data = cmd_parse(frame)
+			task_id, ratio = data[0], data[1:]
+			exec_nowait()
+			pass
+		pass
 	pass
 
 def tcplink(sock, addr):
@@ -213,6 +228,7 @@ def main():
 	while True:
 		sock, addr = skt.accept()
 		t = Thread(target=tcplink, args=(sock, addr))
+		t.setDaemon(True)
     	t.start()
 		pass
 	pass

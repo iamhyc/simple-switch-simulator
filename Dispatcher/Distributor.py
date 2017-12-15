@@ -47,10 +47,7 @@ class QueueCoder:
 	def setRatio(self, ratio):
 		#Ratio, Start, Stop, Switch
 		#need a <Counter Class> first
-		try:
-			self.splitter = [float(x) for x in ratio]
-		except Exception as e:
-			pass
+		self.splitter = [float(x) for x in ratio]
 		pass
 
 	def clearAll(self):
@@ -171,6 +168,7 @@ class Distributor(Process):
 		return True
 
 	def setRatio(self, ratio):
+		ratio = [float(x) for x in ratio]
 		self.encoder.setRatio(ratio)
 		return self.response(True)
 
@@ -196,15 +194,15 @@ class Distributor(Process):
 	'''
 	def uplinkThread(self):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		fb_skt.setblocking(0) #Non-blocking Socket
-		fb_skt.bind(('', self.fb_port)) #should bind to the wifi_ip
+		fb_skt.bind(('', self.fb_port))
 
 		while True:
 			try:
 				data = fb_skt.recv(1024)
 				status, data = data[0], data[1:]
 				if status=='+': #statistical data
-					self.fb_q.put(' '.join([task_id, data[1:]]))
+					frame = '%s %s'%(task_id, data[1:])
+					self.fb_q.put_nowait(frame)
 					pass
 				elif status=='-': #retransmission rquest
 					self.encoder.reput(int(data))
