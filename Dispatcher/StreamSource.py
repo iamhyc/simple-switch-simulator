@@ -5,7 +5,7 @@ Source: Data Flow Source
 '''
 import json
 import threading, Queue
-import os.path.getsize
+from os.path import getsize
 from sys import maxint
 from time import ctime, sleep
 from urllib2 import urlopen

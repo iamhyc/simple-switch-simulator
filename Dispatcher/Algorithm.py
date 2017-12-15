@@ -1,6 +1,6 @@
 #! /usr/bin/python
 from multiprocessing import Process, Queue
-from threading import Thread
+import threading
 from time import sleep
 import Queue
 
@@ -13,17 +13,17 @@ class Algorithm(Process):
 		@desc
 	"""
 	def __init__(self, queue):
+		#1 Internal Init
 		Process.__init__(self)
 		self.fb_q, self.a2p_q = queue
 		self.tensity = 0.9 #higher for faster response
+		#2 Map Init
 		self.term_map = {}
 		self.const_map = {
 			'wifi': 0,
 			'vlc': 1
 		}
-		#Thread Handle Init
-		self.applyHandle = Thread(target=self.applyThread, args=(10.0,))
-		self.applyHandle.setDaemon(True)
+		pass
 
 	def countup(self, frame):
 		task_id, link_name, data = frame_parse(frame)
@@ -46,14 +46,14 @@ class Algorithm(Process):
 	Process Thread Function
 	'''
 	def applyThread(self, interval):
-		wifi, vlc = self.const_map['wifi','vlc'], self.const_map['vlc']
+		wifi, vlc = self.const_map['wifi'], self.const_map['vlc']
 		while True:
 			for (k,v) in self.term_map.items():
 				#apply operations, self.a2p_q
-				r = v['rate'][wifi] / v['rate'][vlc]
+				r = v['rate'][wifi] / v['raste'][vlc]
 				frame = "%s %s %.2f %.2f"('ratio', k, r/(1+r), 1/(1+r))
 				pass
-			sleep(invertal) #apply periodically
+			sleep(interval) #apply periodically
 			pass
 		pass
 
@@ -61,6 +61,10 @@ class Algorithm(Process):
 	Process Entrance Function
 	'''
 	def alg_start(self):
+		print('Algorithm Node is online...')
+		#3 Thread Handle Init
+		self.applyHandle = threading.Thread(target=self.applyThread, args=(5.0,))
+		self.applyHandle.setDaemon(True)
 		self.applyHandle.start()
 		pass
 
@@ -69,7 +73,7 @@ class Algorithm(Process):
 
 	def alg_exit(self):
 		print("<%s> now exit..."%("Algorithm node"))
-		alg_exit()
+		exit()
 		pass
 
 	def run(self):
@@ -82,7 +86,7 @@ class Algorithm(Process):
 					pass
 				pass
 		except Exception as e:
-			#raise e #for debug
+			print(e) #for debug
 			pass
 		finally:
 			self.alg_exit()

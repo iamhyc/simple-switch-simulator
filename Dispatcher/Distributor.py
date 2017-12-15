@@ -240,6 +240,7 @@ class Distributor(Process):
 				#print('To Wi-Fi link: %s'%(data))
 				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
 				pass
+			pass
 		pass
 
 	'''

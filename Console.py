@@ -6,7 +6,7 @@ import platform as pt
 import socket
 
 global localuser, remote_cmdip
-global config
+global skt, config
 
 win_pt = "windows" in pt.platform().lower()
 
@@ -54,9 +54,15 @@ def request(frame, timeout=None):
 def main():
 	global skt
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	skt.connect(('', config['converg_disp_port']))
 
-	_cls()
+	try:
+		skt.connect(('localhost', config['converg_disp_port']))
+	except Exception as e:
+		cprint('bye', 'red')
+		time.sleep(0.5)
+		raise e
+
+	#_cls()
 	helper()
 	while True:
 		tipstr = colored(localuser+" @ Aggregator:["+time.ctime()+"]\n$ ", 'cyan', 'on_grey')
@@ -113,5 +119,6 @@ if __name__ == '__main__':
 		main()
 	except Exception as e:
 		_cls()
+		pass
 	finally:
 		exit()

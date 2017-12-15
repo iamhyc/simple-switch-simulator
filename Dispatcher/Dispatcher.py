@@ -4,8 +4,8 @@ Dispatcher: for command manipulation
 @author: Mark Hong
 '''
 import json
+import threading
 from multiprocessing import Process, Queue
-from threading import Thread
 import socket, string, binascii
 
 from Distributor import Distributor
@@ -40,7 +40,7 @@ def response(status, sock, optional=''):
 	if optional != '':
 		frame += optional
 	
-	skt_res.send(frame)
+	sock.send(frame)
 	pass
 
 def request(frame, sock, timeout=None):
@@ -178,7 +178,7 @@ def disp_init():
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	skt.bind(('', config['converg_disp_port']))
 	skt.listen(10)
-	# plugin Alg. Node Init 
+	# plugin Alg. Node Init
 	ClientCount = 0
 	fb_q = Queue()
 	a2p_q = Queue()
@@ -186,7 +186,7 @@ def disp_init():
 	alg_node.daemon = True #set as daemon process
 	alg_node.start()
 	# plugin Alg. Node feedback
-	fbHandle = Thread(target=fbThread, args=(fb_q, ))
+	fbHandle = threading.Thread(target=fbThread, args=(fb_q, ))
 	fbHandle.setDaemon(True)
 	fbHandle.start()
 	pass
@@ -227,9 +227,9 @@ def main():
 
 	while True:
 		sock, addr = skt.accept()
-		t = Thread(target=tcplink, args=(sock, addr))
+		t = threading.Thread(target=tcplink, args=(sock, addr))
 		t.setDaemon(True)
-    	t.start()
+		t.start()
 		pass
 	pass
 
@@ -241,7 +241,7 @@ if __name__ == '__main__':
 	try:
 		main()
 	except Exception as e:
-		#raise e #for debug
+		raise e #for debug
 		pass
 	finally:
 		disp_exit()
