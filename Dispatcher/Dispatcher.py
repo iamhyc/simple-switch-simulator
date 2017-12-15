@@ -111,8 +111,8 @@ def register_client_op(cmd, sock, addr):
 	ClientCount += 1
 	pass
 
-def remove_client_op(cmd, sock, addr):
-	task_id = cmd[0]
+def dist_exit_op(cmd, sock, addr):
+	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
 	if not proc_map.has_key(task_id):
 		raise Exception
 
@@ -169,10 +169,10 @@ def disp_init():
 		"ls":process_print_op,
 		"add":register_client_op,
 		# Specific Operation
-		"rm":remove_client_op,
 		"src":set_source_op,
 		"src-now":start_source_op,
-		"idle":idle_work_op
+		"idle":idle_work_op,
+		"finish":dist_exit_op,
 	}
 	# converg Socket Init
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
