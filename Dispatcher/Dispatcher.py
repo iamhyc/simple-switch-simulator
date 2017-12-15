@@ -209,13 +209,12 @@ def fbThread(fb_q):
 
 def tcplink(sock, addr):
 	while True:
-		data = sock.recv(1024)
-		op, cmd = cmd_parse(data)
 		try:
+			data = sock.recv(1024)
+			op, cmd = cmd_parse(data)
 			ops_map[op](cmd, sock, addr)
-		except Exception as e:
-			print('\nErrorCode: %s'%(e))
-			print('\"%s\" from %s'%(data, addr))
+		except (socket.error, Exception) as e:
+			if e.message=='' : return
 			response(False, sock)
 			pass
 		pass
@@ -241,7 +240,7 @@ if __name__ == '__main__':
 	try:
 		main()
 	except Exception as e:
-		raise e #for debug
+		#raise e #for debug
 		pass
 	finally:
 		disp_exit()

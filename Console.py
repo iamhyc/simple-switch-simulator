@@ -45,7 +45,7 @@ def script_file(file):
 def request(frame, timeout=None):
 	skt.settimeout(timeout)
 	skt.send(frame)
-	data = skt.recv()
+	data = skt.recv(1024)
 	status = True if data=='+' else False
 	skt.settimeout(None)
 	return status, data[1:]
@@ -103,6 +103,7 @@ def main():
 			pass
 		except Exception as e:
 			#raise e ##for debug
+			print(e)
 			cprint("...", 'red')
 			pass
 		pass
