@@ -23,6 +23,7 @@ def helper():
 	print("                 [ADD]   Add a Client							")
 	print("                 [RM]    Remove a Client							")
 	print("                 [SW]    Switch a Client Link					")
+	print("                 [SRC]   Change a Client Source					")
 	print("                 [SC]    Execute Script File						")
 	print("                 [CLS]   Clear screen							")
 	print("                 [EXIT]  Exit									")
@@ -79,13 +80,19 @@ def main():
 				#'<command> <ip1> <ip2>'
 				tmp = ('%s %s %s 1'%('add', cmd[0], cmd[1]))
 				status, data = request(tmp, 3)
-				print(tmp)
+				print(status)
+				pass
+			elif op=='src' and len(cmd)>=3:
+				#'<command> <task_id> <type> <data>'
+				tmp = ('%s %s %s %s'%('src', cmd[0], cmd[1], cmd[2]))
+				status, data = request(tmp, 3)
+				print(status)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
-				tmp = ('%s %s'%("rm", cmd[0]))
+				tmp = ('%s %s'%("exit", cmd[0]))
 				status, data = request(tmp, 3)
-				print(tmp)
+				print(status)
 				pass
 			elif op=='sc' and len(cmd)>=1:
 				script_file(cmd[1])
@@ -102,8 +109,7 @@ def main():
 				cprint("Not Supported Format or Command.", 'red')
 			pass
 		except Exception as e:
-			#raise e ##for debug
-			print(e)
+			#raise e #for debug
 			cprint("...", 'red')
 			pass
 		pass

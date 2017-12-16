@@ -77,6 +77,20 @@ def process_print_op(cmd, sock, addr):
 	response(True, sock, proc_list)
 	pass
 
+def dist_exit_op(cmd, sock, addr):
+	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
+	task_id = int(task_id)
+	if not proc_map.has_key(task_id):
+		raise Exception('hehe')
+
+	print(proc_map[task_id])
+	proc_map[task_id]['thread'].terminate() #forcely exit the server
+	del proc_map[task_id] # delete the item
+	print('333')
+
+	response(True, sock)
+	pass
+
 def register_client_op(cmd, sock, addr):
 	global ClientCount
 
@@ -92,13 +106,13 @@ def register_client_op(cmd, sock, addr):
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
 	proc_map[task_id]['res_sock'] = sock
 	proc_map[task_id]['queue'] = (p2c_q, c2p_q, fb_q)
-	proc_map[task_id]['_thread'] = Distributor(
+	proc_map[task_id]['thread'] = Distributor(
 									task_id,
 									proc_map[task_id]['char'], 
 									proc_map[task_id]['queue']
 								)
-	proc_map[task_id]['_thread'].daemon = True #set as daemon process
-	proc_map[task_id]['_thread'].start()
+	proc_map[task_id]['thread'].daemon = True #set as daemon process
+	proc_map[task_id]['thread'].start()
 	#default source with `unique` <static> data, and wait to trigger
 
 	response(True, sock, str(port))
@@ -109,18 +123,6 @@ def register_client_op(cmd, sock, addr):
 	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 
 	ClientCount += 1
-	pass
-
-def dist_exit_op(cmd, sock, addr):
-	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
-	if not proc_map.has_key(task_id):
-		raise Exception
-
-	#proc_map[task_id].join() # wait for itself exit
-	proc_map[task_id]['_thread'].terminate() #forcely exit the server
-	del proc_map[task_id] # delete the item
-
-	response(True, sock)
 	pass
 
 def set_source_op(cmd, sock, addr):
@@ -172,7 +174,7 @@ def disp_init():
 		"src":set_source_op,
 		"src-now":start_source_op,
 		"idle":idle_work_op,
-		"finish":dist_exit_op,
+		"exit":dist_exit_op,
 	}
 	# converg Socket Init
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -215,6 +217,7 @@ def tcplink(sock, addr):
 			ops_map[op](cmd, sock, addr)
 		except (socket.error, Exception) as e:
 			if e.message=='' : return
+			print(e)
 			response(False, sock)
 			pass
 		pass

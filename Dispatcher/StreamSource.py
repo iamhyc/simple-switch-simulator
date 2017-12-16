@@ -99,11 +99,11 @@ class StreamSource:
 		self.length = 1500 #default value
 		self.paused = True
 		self.ops_map = {
-			'udp':setSource,
-			'static':setSource,
-			'file':setSource,
-			'length':setLength,
-			'speed':setSpeed
+			'udp':self.setSource,
+			'static':self.setSource,
+			'file':self.setSource,
+			'length':self.setLength,
+			'speed':self.setSpeed
 		}
 		self.src_map = {
 			'udp':udp_ops_class,
@@ -111,7 +111,7 @@ class StreamSource:
 			'static':static_ops_class
 		}
 		# Source Buffer
-		self.buffer = Queue()
+		self.buffer = Queue.Queue()
 		# Cource Buffer Handle
 		self.data = self.src_map[src[0]](src[1], self.length)
 		self.sourceHandle = threading.Thread(target=self.readThread, args=())
