@@ -47,7 +47,7 @@ def request(frame, timeout=None):
 	skt.settimeout(timeout)
 	skt.send(frame)
 	data = skt.recv(1024)
-	status = True if data=='+' else False
+	status = True if data[0]=='+' else False
 	skt.settimeout(None)
 	return status, data[1:]
 	pass
@@ -84,7 +84,7 @@ def main():
 				pass
 			elif op=='src' and len(cmd)>=3:
 				#'<command> <task_id> <type> <data>'
-				tmp = ('%s %s %s %s'%('src', cmd[0], cmd[1], cmd[2]))
+				tmp = ('%s %s %s %s'%('src-set', cmd[0], cmd[1], cmd[2]))
 				status, data = request(tmp, 3)
 				print(status)
 				pass

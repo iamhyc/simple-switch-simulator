@@ -4,11 +4,10 @@ Dispatcher: for data flow manipulation
 @author: Mark Hong
 '''
 import json, random, string, crcmod
-from time import sleep, ctime
-from multiprocessing import Process, Queue
-import thread
-import socket
+import thread, socket, Queue
 import binascii, struct, ctypes
+from time import sleep, ctime
+from multiprocessing import Process
 
 from StreamSource import StreamSource
 
@@ -29,19 +28,21 @@ class QueueCoder:
 		self.number = len(tuple_q)
 		self.win_size = sWindow
 		self.count = 0
-		self.crcGen = crcmod.predefined.Crc('crc-16')
-		#Seq[4B] + Size[2B] + Offset[2B] + CRC16[2B] + Data
-		#Or: Tail_Flag[1b]|Seq[4B] + Order[1B] + CRC8[2B] + Data
-		print(dir(struct.Struct))
-		# self.frame = struct.Struct('IHHH') #Or, Struct('IBs')
-		# self.buffer = ctypes.create_string_buffer(self.frame.size)
-		# self.crcFrame = struct.Struct('IHH')
-		# self.crcBuffer = ctypes.create_string_buffer(self.crcFrame.size)
 		#(ring)Buffer Array as tx sliding window
 		self.tx_window = [0] * sWindow
 		for x in xrange(sWindow):
 			self.tx_window[x] = [chr(0)] * self.number
 			pass
+		pass
+
+	def class_init(self):
+		self.crcGen = crcmod.predefined.Crc('crc-16')
+		#Seq[4B] + Size[2B] + Offset[2B] + CRC16[2B] + Data
+		#Or: Tail_Flag[1b]|Seq[4B] + Order[1B] + CRC8[2B] + Data
+		self.frame = struct.Struct('IHHH') #Or, Struct('IBs')
+		self.buffer = ctypes.create_string_buffer(self.frame.size)
+		self.crcFrame = struct.Struct('IHH')
+		self.crcBuffer = ctypes.create_string_buffer(self.crcFrame.size)
 		pass
 
 	def setRatio(self, ratio):
@@ -130,131 +131,142 @@ class Distributor(Process):
 			pass
 
 		#2 plugin Source Init
-		# data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
-		# self.src = StreamSource(["static", data]) #udp/file_p/static
+		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
+		self.src = StreamSource(["static", data]) #udp/file_p/static
 
 		#3 Socket Init
 		self.__vlc_skt = None
 		self.__wifi_skt = None
 
-		#4 Socket Queue Init 
-		self.wifi_q = Queue()
-		self.vlc_q = Queue()
+		#4 Operation Map Driver
+		self.ops_map = {
+			"src-get":self.getSource,
+			"src-set":self.configSource,
+			"src-now":self.triggerSource,
+			"set":self.setValue,
+			"ratio":self.setRatio,
+		}
+		pass
+
+	def class_init(self):
+		#5 Socket Queue Init 
+		self.wifi_q = Queue.Queue()
+		self.vlc_q = Queue.Queue()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
 			(0.0,			1.0),
 			int(self.config['sWindow_rx'])
 		)
-
-		#5 Operation Map Driver
-		# self.ops_map = {
-		# 	"src":self.configSource,
-		# 	"src-now":self.triggerSource,
-		# 	"set":self.setValue,
-		# 	"ratio":self.setRatio,
-		# }
 		pass
 
 	'''
 	Process Helper Function
 	'''
-	# def response(self, status, frame=''):
-	# 	if status:
-	# 		data = '+'
-	# 	else:
-	# 		data = '-'
+	def response(self, status, frame=''):
+		if status:
+			data = '+'
+		else:
+			data = '-'
 
-	# 	self.c2p_q.put_nowait(data + frame)
-	# 	return True
+		frame = '%s%s'%(data, frame)
+		self.c2p_q.put_nowait(frame)
+		return True
 
-	# def setRatio(self, ratio):
-	# 	ratio = [float(x) for x in ratio]
-	# 	self.encoder.setRatio(ratio)
-	# 	return self.response(True)
+	def setRatio(self, ratio):
+		ratio = [float(x) for x in ratio]
+		self.encoder.setRatio(ratio)
+		return self.response(True)
 
-	# def setValue(self, tuple):
-	# 	return self.response(True)
+	def setValue(self, tuple):
+		return self.response(True)
 
-	# def triggerSource(self, cmd):
-	# 	self.src.start()
-	# 	return self.response(True)
+	def triggerSource(self, cmd):
+		self.src.start()
+		return self.response(True)
 
-	# def configSource(self, cmd):
-	# 	if self.src.config(cmd): #True for Restart
-	# 		self.encoder.clearAll()
-	# 		fhash = self.src.data.data_gethash_op()
-	# 		fsize = self.src.data.data_getsize_op()
-	# 		flength = self.src.length
-	# 		frame = 'src-now %d %d %d'%(fhash, fsize, flength)
-	# 		return self.response(True, frame)
-	# 	return self.response(False)
+	def configSource(self, cmd):
+		cmd = cmd[0].split(' ')
+		if self.src.config(cmd): #True for Restart
+			self.encoder.clearAll()
+			fhash = self.src.data.data_gethash_op()
+			fsize = self.src.data.data_getsize_op()
+			flength = self.src.length
+			frame = 'src-now %d %d %d'%(fhash, fsize, flength) #notify Rx side
+			return self.response(True, frame)
+		return self.response(False)
 
-	# '''
-	# Process Thread Function
-	# '''
-	# def uplinkThread(self):
-	# 	fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	# 	fb_skt.bind(('', self.fb_port))
+	def getSource(self, cmd):
+		frame = self.src.getSource()
+		return self.response(True, frame)
+	'''
+	Process Thread Function
+	'''
+	def uplinkThread(self):
+		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		fb_skt.bind(('', self.fb_port))
 
-	# 	while True:
-	# 		try:
-	# 			data = fb_skt.recv(1024)
-	# 			status, data = data[0], data[1:]
-	# 			if status=='+': #statistical data
-	# 				frame = '%s %s'%(task_id, data[1:])
-	# 				self.fb_q.put_nowait(frame)
-	# 				pass
-	# 			elif status=='-': #retransmission rquest
-	# 				self.encoder.reput(int(data))
-	# 				pass
-	# 		except Exception as e:
-	# 			pass
-	# 	pass
+		while True:
+			try:
+				data = fb_skt.recv(1024)
+				status, data = data[0], data[1:]
+				if status=='+': #statistical data
+					frame = '%s %s'%(task_id, data[1:])
+					self.fb_q.put_nowait(frame)
+					pass
+				elif status=='-': #retransmission rquest
+					self.encoder.reput(int(data))
+					pass
+			except Exception as e:
+				pass
+		pass
 
-	# def distXmitThread(self):
-	# 	while True:
-	# 		if not self.src.empty():
-	# 			raw = self.src.get()
-	# 			self.encoder.put(raw)
-	# 			pass
-	# 		pass
-	# 	pass
+	def distXmitThread(self):
+		while True:
+			if not self.src.empty():
+				raw = self.src.get()
+				self.encoder.put(raw)
+				pass
+			pass
+		pass
 
-	# def vlcXmitThread(self, port):
-	# 	self.__vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	def vlcXmitThread(self, port):
+		self.__vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-	# 	while True:
-	# 		if not self.vlc_q.empty():
-	# 			data = self.vlc_q.get_nowait()
-	# 			#print('To VLC link: %s'%(data))
-	# 			self.__vlc_skt.sendto(data, (self.vlc_ip, port))
-	# 			pass
-	# 	pass
+		while True:
+			if not self.vlc_q.empty():
+				data = self.vlc_q.get_nowait()
+				#print('To VLC link: %s'%(data))
+				self.__vlc_skt.sendto(data, (self.vlc_ip, port))
+				pass
+		pass
 
-	# def wifiXmitThread(self, port):
-	# 	self.__wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	def wifiXmitThread(self, port):
+		self.__wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-	# 	while True:
-	# 		if not self.wifi_q.empty():
-	# 			data = self.wifi_q.get_nowait()
-	# 			#print('To Wi-Fi link: %s'%(data))
-	# 			self.__wifi_skt.sendto(data, (self.wifi_ip, port))
-	# 			pass
-	# 		pass
-	# 	pass
+		while True:
+			if not self.wifi_q.empty():
+				data = self.wifi_q.get_nowait()
+				#print('To Wi-Fi link: %s'%(data))
+				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
+				pass
+			pass
+		pass
 
-	# '''
-	# Process Entrance Function
-	# '''
-	# def dist_start(self):
-	# 	#init feedback link --> non-blocking check
-	# 	thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
-	# 	#init transmission link --> idle
-	# 	thread.start_new_thread(self.vlcXmitThread, (self.config['stream_vlc_port_tx'], ))
-	# 	thread.start_new_thread(self.wifiXmitThread, (self.config['stream_wifi_port'], ))
-	# 	#init data source --> busy
-	# 	thread.start_new_thread(self.distXmitThread,())
-	# 	pass
+	'''
+	Process Entrance Function
+	'''
+	def dist_start(self):
+		self.class_init()
+		self.src.class_init()
+		self.encoder.class_init()
+		#init feedback link --> non-blocking check
+		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
+		#init transmission link --> idle
+		thread.start_new_thread(self.vlcXmitThread, (self.config['stream_vlc_port_tx'], ))
+		thread.start_new_thread(self.wifiXmitThread, (self.config['stream_wifi_port'], ))
+		#init data source --> busy
+		thread.start_new_thread(self.distXmitThread,())
+		pass
 
 	def dist_stop(self):
 		#close socket here
@@ -265,13 +277,13 @@ class Distributor(Process):
 
 	def run(self):
 		try: # manipulate with process termination signal
-			# self.dist_start()
+			self.dist_start()
 			while True: # main loop for control
-				# if not self.p2c_q.empty(): # data from Parent queue
-				# 	data = self.p2c_q.get_nowait()
-				# 	op, cmd = cmd_parse(data)
-				# 	self.ops_map[op](cmd)
-				# 	pass
+				if not self.p2c_q.empty(): # data from Parent queue
+					data = self.p2c_q.get_nowait()
+					op, cmd = cmd_parse(data)
+					self.ops_map[op](cmd)
+					pass
 				pass
 		except Exception as e:
 			print(e) #for debug

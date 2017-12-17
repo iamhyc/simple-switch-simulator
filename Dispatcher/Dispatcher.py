@@ -73,20 +73,23 @@ def exec_wait(task_id, cmd):
 Process Command Function
 '''
 def process_print_op(cmd, sock, addr):
-	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
+	proc_list = ''
+	for (k,v) in proc_map.items():
+		data = exec_wait(k, 'src-get')
+		status, src_char = data[0], data[1:]
+		proc_list += '%s\t%s\n\t%s'%(k, v['char'], src_char)
+		pass
 	response(True, sock, proc_list)
 	pass
 
 def dist_exit_op(cmd, sock, addr):
-	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
-	task_id = int(task_id)
+	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
+
 	if not proc_map.has_key(task_id):
 		raise Exception('hehe')
 
-	print(proc_map[task_id])
 	proc_map[task_id]['thread'].terminate() #forcely exit the server
 	del proc_map[task_id] # delete the item
-	print('333')
 
 	response(True, sock)
 	pass
@@ -126,13 +129,15 @@ def register_client_op(cmd, sock, addr):
 	pass
 
 def set_source_op(cmd, sock, addr):
-	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
+	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
 	if proc_map.has_key(task_id):
-		p2c_cmd = ''.join(['src'] + cmd[1:])
+		p2c_cmd = ' '.join(['src-set'] + cmd[1:])
 
 		res = exec_wait(task_id, p2c_cmd)
 		if res[0]=='+': # need notify Terminal side
-			request(res[1:], proc_map[task_id]['req_sock'])
+			frame = res[1:]
+			print('notify %d'%(task_id))
+			request(frame, proc_map[task_id]['req_sock'])
 			pass
 		response(True, sock) # to Controller Side
 		pass
@@ -142,7 +147,7 @@ def set_source_op(cmd, sock, addr):
 	pass
 
 def start_source_op(cmd, sock, addr):
-	task_id = proc_remap[addr] if cmd[0] == '-1' else cmd[0] #-1 for no id
+	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = 'src-now'
 		res = exec_wait(task_id, p2c_cmd)
@@ -171,7 +176,7 @@ def disp_init():
 		"ls":process_print_op,
 		"add":register_client_op,
 		# Specific Operation
-		"src":set_source_op,
+		"src-set":set_source_op,
 		"src-now":start_source_op,
 		"idle":idle_work_op,
 		"exit":dist_exit_op,

@@ -3,7 +3,7 @@
 Source: Data Flow Source
 @author: Mark Hong
 '''
-import json
+import json, socket
 import threading, Queue
 from os.path import getsize
 from sys import maxint
@@ -23,15 +23,16 @@ def zeroPadding(length, data):
 class udp_ops_class:
 	"""docstring for udp_ops_class"""
 	def __init__(self, port, length):
-		port = int(port)
+		self.char = ('udp', port, length)
+		self.port, self.length = int(port), length
 		self.skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.skt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
 		#self.skt.setblocking(0)
-		self.skt.bind(('', port))
+		self.skt.bind(('', self.port))
 		pass
 	
 	def data_gethash_op(self):
-		return hash(self.url)
+		return hash(self.port)
 
 	def data_getsize_op(self):
 		return (-1)*self.length
@@ -47,6 +48,7 @@ class udp_ops_class:
 class file_ops_class:
 	"""docstring for file_ops_class"""
 	def __init__(self, url, length):
+		self.char = ('file', url, length)
 		self.length = length
 		self.url = url
 		self.res = open(url, 'wb')
@@ -69,6 +71,7 @@ class file_ops_class:
 class static_ops_class:
 	"""docstring for static_ops_class"""
 	def __init__(self, data, length):
+		self.char = ('static', data, length)
 		self.data = data
 		self.length = length
 		pass
@@ -103,43 +106,51 @@ class StreamSource:
 			'static':self.setSource,
 			'file':self.setSource,
 			'length':self.setLength,
-			'speed':self.setSpeed
+			'speed':self.setSpeed,
+			'get':self.getSource
 		}
 		self.src_map = {
 			'udp':udp_ops_class,
 			'file':file_ops_class,
 			'static':static_ops_class
 		}
-		# Source Buffer
-		self.buffer = Queue.Queue()
-		# Cource Buffer Handle
 		self.data = self.src_map[src[0]](src[1], self.length)
-		self.sourceHandle = threading.Thread(target=self.readThread, args=())
-		self.sourceHandle.setDaemon(True)
-		self.sourceHandle.start()
 		pass
 
+	def class_init(self):
+		# Source Buffer
+		self.buffer = Queue.Queue()
+		# Source Buffer Handle
+		self.sourceHandle = threading.Thread(target=self.readThread, args=())
+		self.sourceHandle.setDaemon(True)
+		pass
+
+	def config(self, cmd):
+		return self.ops_map[cmd[0]](cmd[0], cmd[1])
 	'''
 	SET Operation Function
 	'''
-	def config(self, cmd):
-		return self.ops_map[cmd[0]](cmd[1])
-
-	def setSpeed(self, data):
+	def setSpeed(self, op, data):
 		self.speed = float(data)
 		return False # Not reset
 
-	def setLength(self, data):
+	def setLength(self, op, data):
 		self.length = int(data)
 		return True # Need reset
 
-	def setSource(self, cmd):
+	def setSource(self, op, cmd):
 		self.stop() # stop read thread
 		self.data.data_close_op() # close previous source
 		self.buffer.queue.clear() # clear previous buffer
 
-		self.data = self.src_map[cmd[0]](cmd[1], self.length)
+		self.data = self.src_map[op](cmd, self.length)
 		return True # need reset
+
+	'''
+	GET Operation Function
+	'''
+	def getSource(self, op):
+		return self.data.char
 
 	'''
 	DataSource Related Function
