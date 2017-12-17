@@ -77,7 +77,7 @@ def process_print_op(cmd, sock, addr):
 	for (k,v) in proc_map.items():
 		data = exec_wait(k, 'src-get')
 		status, src_char = data[0], data[1:]
-		proc_list += '%s\t%s\n\t%s'%(k, v['char'], src_char)
+		proc_list += '%s\t%s\n\t%s\n'%(k, v['char'], src_char)
 		pass
 	response(True, sock, proc_list)
 	pass
@@ -121,7 +121,7 @@ def register_client_op(cmd, sock, addr):
 	response(True, sock, str(port))
 	if rc == '0':
 		proc_map[task_id]['req_sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		proc_map[task_id]['req_sock'].connect((addr, config['converg_term_port']))
+		proc_map[task_id]['req_sock'].connect((addr[0], config['converg_term_port']))
 		pass
 	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 

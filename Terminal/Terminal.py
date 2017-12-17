@@ -8,8 +8,7 @@ from Aggregator import Aggregator
 
 import json, math
 import socket, string, binascii
-from threading import Thread
-from multiprocessing import Process, Queue
+import threading, multiprocessing
 from optparse import OptionParser
 
 global config, options
@@ -43,11 +42,11 @@ def response(status, sock, optional=''):
 	pass
 
 def request(frame, timeout=None):
-	skt.settimeout(timeout)
-	skt.send(frame)
-	data = skt.recv()
+	skt_req.settimeout(timeout)
+	skt_req.send(frame)
+	data = skt_req.recv(1024)
 	status = True if data=='+' else False
-	skt.settimeout(None)
+	skt_req.settimeout(None)
 	return status, data[1:]
 	pass
 
@@ -107,6 +106,7 @@ def tcplink(sock, addr):
 
 def term_exit():
 	#terminate thread here
+	request('exit -1', 3)
 	exit()
 	pass
 
@@ -132,7 +132,7 @@ def term_init():
 
 	# Register Procedure
 	init_cmd = ('%s %s %s 0'%('add', options.wifi, options.vlc))
-	status, fb_port = request(init_cmd) #block until feedback
+	status, fb_port = request(init_cmd, 3) #block until feedback
 	fb_port = int(fb_port)
 	sock, addr = skt_res.accept() #accepet reverse TCP link
 	
@@ -140,14 +140,14 @@ def term_init():
 	p2c_q = multiprocessing.Queue() #Parent to Child Queue
 	c2p_q = multiprocessing.Queue() #Child to Parent Queue
 	queue = (p2c_q, c2p_q)
-	processor = Aggregator(queue, (options.server,fb_port))
+	processor = Aggregator(queue, (options.server, fb_port))
 	processor.daemon = True
 
 	# Run NOW
-	print('Connected with uplink port %d.'%(fb_port))
+	print('[Terminal] Connected with uplink port %d.'%(fb_port))
 	processor.start()
-	t = Thread(target=tcplink, args=(sock, addr))
-    t.start()
+	t = threading.Thread(target=tcplink, args=(sock, addr[0]))
+	t.start()
 	pass
 
 
@@ -157,8 +157,8 @@ def main():
 
 	while True:
 		sock, addr = skt_res.accept()
-		t = Thread(target=tcplink, args=(sock, addr))
-    	t.start()
+		t = threading.Thread(target=tcplink, args=(sock, addr[0]))
+		t.start()
 		pass
 	pass
 
@@ -170,15 +170,15 @@ if __name__ == '__main__':
 	parser = OptionParser()
 	parser.add_option("-s", "--server",
 		dest="server", 
-		default="localhost", 
+		default="127.0.0.1", 
 		help="Designate the dispatcher server")
 	parser.add_option("-w", "--wifi",
 		dest="wifi", 
-		default="localhost", 
+		default="127.0.0.1", 
 		help="Designate the Wi-Fi interface")
 	parser.add_option("-v", "--vlc",
 		dest="vlc", 
-		default="localhost", 
+		default="127.0.0.1", 
 		help="Designate the VLC interface")
 	(options, args) = parser.parse_args()
 

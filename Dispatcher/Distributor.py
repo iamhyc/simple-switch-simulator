@@ -54,7 +54,7 @@ class QueueCoder:
 	def clearAll(self):
 		for x in xrange(self.number):
 			self.tuple_q[x].queue.clear()
-		del self.tx_window #dec reference counter
+		#del self.tx_window #dec reference counter
 		self.count = 0 #reset packet sequence
 		pass
 

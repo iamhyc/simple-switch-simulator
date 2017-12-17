@@ -23,7 +23,7 @@ def zeroPadding(length, data):
 class udp_ops_class:
 	"""docstring for udp_ops_class"""
 	def __init__(self, port, length):
-		self.char = ('udp', port, length)
+		self.char = ('udp', port)
 		self.port, self.length = int(port), length
 		self.skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.skt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
@@ -48,7 +48,7 @@ class udp_ops_class:
 class file_ops_class:
 	"""docstring for file_ops_class"""
 	def __init__(self, url, length):
-		self.char = ('file', url, length)
+		self.char = ('file', url)
 		self.length = length
 		self.url = url
 		self.res = open(url, 'wb')
@@ -71,7 +71,7 @@ class file_ops_class:
 class static_ops_class:
 	"""docstring for static_ops_class"""
 	def __init__(self, data, length):
-		self.char = ('static', data, length)
+		self.char = ('static', data)
 		self.data = data
 		self.length = length
 		pass
@@ -80,7 +80,7 @@ class static_ops_class:
 		return hash(self.data)
 
 	def data_getsize_op(self):
-		return len(data)
+		return len(self.data)
 
 	def data_read_op(self):
 		return zeroPadding(self.length, self.data)
@@ -130,12 +130,13 @@ class StreamSource:
 	'''
 	SET Operation Function
 	'''
-	def setSpeed(self, op, data):
-		self.speed = float(data)
+	def setSpeed(self, op, cmd):
+		self.speed = float(cmd)
 		return False # Not reset
 
-	def setLength(self, op, data):
-		self.length = int(data)
+	def setLength(self, op, cmd):
+		self.length = int(cmd)
+		self.data.length = int(cmd)
 		return True # Need reset
 
 	def setSource(self, op, cmd):
@@ -149,8 +150,8 @@ class StreamSource:
 	'''
 	GET Operation Function
 	'''
-	def getSource(self, op):
-		return self.data.char
+	def getSource(self, op='', cmd=''):
+		return self.data.char + (self.length, self.speed)
 
 	'''
 	DataSource Related Function

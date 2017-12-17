@@ -58,13 +58,10 @@ class Aggregator(multiprocessing.Process):
 		# RingBuffer Init
 		# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
 		self.ringBuffer = [0] * self.config['sWindow_rx']
-		init_ringbuffer()
+		self.init_ringbuffer()
+		pass
 
-		# feedback init
-		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
-		self.redist_q = Queue.Queue()
-		self.fb_q = Queue.Queue()
-		
+	def class_init(self):
 		#Thread Handle Init
 		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, args=('wifi', self.config['stream_wifi_port']))
 		self.wifiRecvHandle.setDaemon(True)
@@ -82,14 +79,12 @@ class Aggregator(multiprocessing.Process):
 		self.uplinkHandle.setDaemon(True)
 		self.procHandle = threading.Thread(target=self.processThread, args=())
 		self.procHandle.setDaemon(True)
-		pass
 
-	def init_ringbuffer(self):
-		for x in xrange(self.config['sWindow_rx']):
-			self.ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
-			pass
+		# feedback init
+		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
+		self.redist_q = Queue.Queue()
+		self.fb_q = Queue.Queue()
 		pass
-
 	'''
 	Process Helper Function
 	'''
@@ -101,6 +96,12 @@ class Aggregator(multiprocessing.Process):
 	def feedback(self, status, ftype='', fdata=''):
 		frame = build_frame(status, ftype, fdata)
 		self.fb_q.put_nowait(frame)
+		pass
+
+	def init_ringbuffer(self):
+		for x in xrange(self.config['sWindow_rx']):
+			self.ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
+			pass
 		pass
 
 	def setParam(self, cmd):
@@ -285,6 +286,8 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def run(self):
+		self.class_init()
+
 		try:
 			while True:
 				if not self.p2c_q.empty():

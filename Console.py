@@ -24,6 +24,7 @@ def helper():
 	print("                 [RM]    Remove a Client							")
 	print("                 [SW]    Switch a Client Link					")
 	print("                 [SRC]   Change a Client Source					")
+	print("                 [NOW]   Start a Client Source					")
 	print("                 [SC]    Execute Script File						")
 	print("                 [CLS]   Clear screen							")
 	print("                 [EXIT]  Exit									")
@@ -85,6 +86,12 @@ def main():
 			elif op=='src' and len(cmd)>=3:
 				#'<command> <task_id> <type> <data>'
 				tmp = ('%s %s %s %s'%('src-set', cmd[0], cmd[1], cmd[2]))
+				status, data = request(tmp, 3)
+				print(status)
+				pass
+			elif op=='now' and len(cmd)>=1:
+				#'<command> <task_id> <type> <data>'
+				tmp = ('%s %s %s %s'%('src-now', cmd[0]))
 				status, data = request(tmp, 3)
 				print(status)
 				pass
