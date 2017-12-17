@@ -104,7 +104,7 @@ def term_init():
 	# Init Aggregator Process
 	p2c_q = multiprocessing.Queue() #Parent to Child Queue
 	c2p_q = multiprocessing.Queue() #Child to Parent Queue
-	se = SyncExecutor(p2c_q, c2p_q)
+	se = AlignExecutor(p2c_q, c2p_q)
 	processor = Aggregator((p2c_q, c2p_q), (options.server, fb_port))
 	processor.daemon = True
 

@@ -18,25 +18,6 @@ global alg_node, fb_q, a2p_q
 ALLOC_PORT_BASE = 20000
 
 '''
-Process Helper Function
-'''
-
-# def exec_nowait(task_id, cmd):
-# 	while not proc_map[task_id]['queue'][1].empty():
-# 		proc_map[task_id]['queue'][1].get()
-# 		pass
-# 	proc_map[task_id]['queue'][0].put_nowait(cmd)
-# 	pass
-
-# def exec_wait(task_id, cmd):
-# 	while not proc_map[task_id]['queue'][1].empty():
-# 		proc_map[task_id]['queue'][1].get()
-# 		pass
-# 	proc_map[task_id]['queue'][0].put(cmd)
-# 	return proc_map[task_id]['queue'][1].get()
-# 	pass
-
-'''
 Process Command Function
 '''
 def process_print_op(cmd, sock, addr):
@@ -76,7 +57,7 @@ def register_client_op(cmd, sock, addr):
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
 	proc_map[task_id]['res_sock'] = sock
-	proc_map[task_id]['se'] = SyncExecutor(p2c_q, c2p_q)
+	proc_map[task_id]['se'] = AlignExecutor(p2c_q, c2p_q)
 	proc_map[task_id]['queue'] = (p2c_q, c2p_q, fb_q)
 	proc_map[task_id]['thread'] = Distributor(
 									task_id,
@@ -194,7 +175,7 @@ def tcplink(sock, addr):
 			ops_map[op](cmd, sock, addr)
 		except (socket.error, Exception) as e:
 			if e.message=='' : return
-			print(e)
+			printh('Dispatcher', e, 'red')
 			response(False, sock)
 			pass
 		pass

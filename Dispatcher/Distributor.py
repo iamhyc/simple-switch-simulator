@@ -177,7 +177,6 @@ class Distributor(multiprocessing.Process):
 		return self.response(True)
 
 	def configSource(self, cmd):
-		cmd = cmd[0].split(' ')
 		if self.src.config(cmd): #True for Restart
 			self.encoder.clearAll()
 			fname, fhash, fsize = self.src.data.char
@@ -277,7 +276,7 @@ class Distributor(multiprocessing.Process):
 					pass
 				pass
 		except Exception as e:
-			print(e) #for debug
+			printh('Distributor', e, 'red') #for debug
 		finally:
 			self.dist_stop()
 			pass

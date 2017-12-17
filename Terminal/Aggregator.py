@@ -288,6 +288,6 @@ class Aggregator(multiprocessing.Process):
 					pass
 				pass
 		except Exception as e:
-			print(e) #for debug
+			printh('Aggregator', e, 'red') #for debug
 		finally:
 			self.agg_exit()

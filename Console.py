@@ -30,16 +30,6 @@ def helper():
 	print
 	pass
 
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]	
-		pass
-	return op, cmd
-	pass
-
 def script_file(file):
 	pass
 

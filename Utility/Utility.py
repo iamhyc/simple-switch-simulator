@@ -52,12 +52,11 @@ def exec_watch(process, hook=None, fatal=False, gen=True):
 		pass
 	pass
 
-
 def printh(tip, cmd, color=None):
 	cprint('[%s] %s'%(tip, cmd), color)
 	pass
 
-class SyncExecutor:
+class AlignExecutor:
 	"""docstring for SyncExecutor"""
 	def __init__(self, p2c_q, c2p_q):
 		self.p2c_q = p2c_q

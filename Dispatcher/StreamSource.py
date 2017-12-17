@@ -19,7 +19,6 @@ def zeroPadding(length, data):
 	else:
 		return ''
 
-
 class udp_ops_class:
 	"""docstring for udp_ops_class"""
 	def __init__(self, port):
