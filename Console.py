@@ -1,9 +1,8 @@
 #! /usr/bin/python
-import os, time, json
-from termcolor import colored, cprint
+from Utility.Utility import *
 from getpass import getuser
 import platform as pt
-import socket
+import os, time, json, socket
 
 global localuser, remote_cmdip
 global skt, config
@@ -44,15 +43,6 @@ def cmd_parse(str):
 def script_file(file):
 	pass
 
-def request(frame, timeout=None):
-	skt.settimeout(timeout)
-	skt.send(frame)
-	data = skt.recv(1024)
-	status = True if data[0]=='+' else False
-	skt.settimeout(None)
-	return status, data[1:]
-	pass
-
 def main():
 	global skt
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,7 +54,7 @@ def main():
 		time.sleep(0.5)
 		raise e
 
-	#_cls()
+	_cls()
 	helper()
 	while True:
 		tipstr = colored(localuser+" @ Aggregator:["+time.ctime()+"]\n$ ", 'cyan', 'on_grey')
@@ -72,7 +62,7 @@ def main():
 
 		try:
 			if op=='ls':
-				status, data = request('ls', 3)
+				status, data = request('ls', skt, 3)
 				_cls()
 				cprint("%s\n"%(data), 'green')
 				helper()
@@ -80,25 +70,25 @@ def main():
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1> <ip2>'
 				tmp = ('%s %s %s 1'%('add', cmd[0], cmd[1]))
-				status, data = request(tmp, 3)
+				status, data = request(tmp, skt, 3)
 				print(status)
 				pass
 			elif op=='src' and len(cmd)>=3:
 				#'<command> <task_id> <type> <data>'
 				tmp = ('%s %s %s %s'%('src-set', cmd[0], cmd[1], cmd[2]))
-				status, data = request(tmp, 3)
+				status, data = request(tmp, skt, 3)
 				print(status)
 				pass
 			elif op=='now' and len(cmd)>=1:
 				#'<command> <task_id> <type> <data>'
 				tmp = ('%s %s %s %s'%('src-now', cmd[0]))
-				status, data = request(tmp, 3)
+				status, data = request(tmp, skt, 3)
 				print(status)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
 				tmp = ('%s %s'%("exit", cmd[0]))
-				status, data = request(tmp, 3)
+				status, data = request(tmp, skt, 3)
 				print(status)
 				pass
 			elif op=='sc' and len(cmd)>=1:

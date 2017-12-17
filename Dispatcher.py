@@ -3,13 +3,12 @@
 Dispatcher: for command manipulation
 @author: Mark Hong
 '''
-import json
-import threading
-from multiprocessing import Process, Queue
-import socket, string, binascii
+import threading, multiprocessing
+import os, json, string, binascii, socket
 
-from Distributor import Distributor
-from Algorithm import Algorithm
+from Dispatcher.Distributor import Distributor
+from Dispatcher.Algorithm import Algorithm
+from Utility.Utility import *
 
 global config
 global proc_map, proc_remap
@@ -21,53 +20,21 @@ ALLOC_PORT_BASE = 20000
 '''
 Process Helper Function
 '''
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]
-		pass
-	return op, cmd
-	pass
 
-def response(status, sock, optional=''):
-	if status:
-		frame = '+'
-	else:
-		frame = '-'
+# def exec_nowait(task_id, cmd):
+# 	while not proc_map[task_id]['queue'][1].empty():
+# 		proc_map[task_id]['queue'][1].get()
+# 		pass
+# 	proc_map[task_id]['queue'][0].put_nowait(cmd)
+# 	pass
 
-	if optional != '':
-		frame += optional
-	
-	sock.send(frame)
-	pass
-
-def request(frame, sock, timeout=None):
-	sock.settimeout(timeout)
-	sock.send(frame)
-	status = sock.recv()
-	sock.settimeout(None)
-	if status[0]=='+':
-		return True
-	else:
-		return False
-	pass
-
-def exec_nowait(task_id, cmd):
-	while not proc_map[task_id]['queue'][1].empty():
-		proc_map[task_id]['queue'][1].get()
-		pass
-	proc_map[task_id]['queue'][0].put_nowait(cmd)
-	pass
-
-def exec_wait(task_id, cmd):
-	while not proc_map[task_id]['queue'][1].empty():
-		proc_map[task_id]['queue'][1].get()
-		pass
-	proc_map[task_id]['queue'][0].put(cmd)
-	return proc_map[task_id]['queue'][1].get()
-	pass
+# def exec_wait(task_id, cmd):
+# 	while not proc_map[task_id]['queue'][1].empty():
+# 		proc_map[task_id]['queue'][1].get()
+# 		pass
+# 	proc_map[task_id]['queue'][0].put(cmd)
+# 	return proc_map[task_id]['queue'][1].get()
+# 	pass
 
 '''
 Process Command Function
@@ -75,9 +42,9 @@ Process Command Function
 def process_print_op(cmd, sock, addr):
 	proc_list = ''
 	for (k,v) in proc_map.items():
-		data = exec_wait(k, 'src-get')
+		data = proc_map[k]['se'].exec_wait('src-get')
 		status, src_char = data[0], data[1:]
-		proc_list += '%s\t%s\n\t%s\n'%(k, v['char'], src_char)
+		proc_list += '%s\t%s\n'%(k, v['char']) + '\t%s\n'%(src_char)
 		pass
 	response(True, sock, proc_list)
 	pass
@@ -92,6 +59,7 @@ def dist_exit_op(cmd, sock, addr):
 	del proc_map[task_id] # delete the item
 
 	response(True, sock)
+	printh('Dispatcher', 'Client %d exit.'%(task_id), 'red')
 	pass
 
 def register_client_op(cmd, sock, addr):
@@ -101,13 +69,14 @@ def register_client_op(cmd, sock, addr):
 	task_id = ClientCount #allocate task_id
 	port = ALLOC_PORT_BASE + ClientCount #allocate port nubmer
 
-	p2c_q = Queue() #Parent to Child Queue
-	c2p_q = Queue() #Child to Parent Queue
+	p2c_q = multiprocessing.Queue() #Parent to Child Queue
+	c2p_q = multiprocessing.Queue() #Child to Parent Queue
 
 	proc_remap[wifi_ip] = task_id #revese map over Wi-Fi link
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
 	proc_map[task_id]['res_sock'] = sock
+	proc_map[task_id]['se'] = SyncExecutor(p2c_q, c2p_q)
 	proc_map[task_id]['queue'] = (p2c_q, c2p_q, fb_q)
 	proc_map[task_id]['thread'] = Distributor(
 									task_id,
@@ -121,9 +90,9 @@ def register_client_op(cmd, sock, addr):
 	response(True, sock, str(port))
 	if rc == '0':
 		proc_map[task_id]['req_sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		proc_map[task_id]['req_sock'].connect((addr[0], config['converg_term_port']))
+		proc_map[task_id]['req_sock'].connect((addr, config['converg_term_port']))
 		pass
-	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
+	printh('Dispatcher', 'Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 
 	ClientCount += 1
 	pass
@@ -132,12 +101,11 @@ def set_source_op(cmd, sock, addr):
 	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = ' '.join(['src-set'] + cmd[1:])
-
-		res = exec_wait(task_id, p2c_cmd)
+		res = proc_map[task_id]['se'].exec_wait(p2c_cmd)
 		if res[0]=='+': # need notify Terminal side
 			frame = res[1:]
-			print('notify %d'%(task_id))
 			request(frame, proc_map[task_id]['req_sock'])
+			print('notified %d'%(task_id))
 			pass
 		response(True, sock) # to Controller Side
 		pass
@@ -150,7 +118,7 @@ def start_source_op(cmd, sock, addr):
 	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
 	if proc_map.has_key(task_id):
 		p2c_cmd = 'src-now'
-		res = exec_wait(task_id, p2c_cmd)
+		res = proc_map[task_id]['se'].exec_wait(p2c_cmd)
 		response(True, sock)
 		pass
 	else:
@@ -187,11 +155,12 @@ def disp_init():
 	skt.listen(10)
 	# plugin Alg. Node Init
 	ClientCount = 0
-	fb_q = Queue()
-	a2p_q = Queue()
+	fb_q = multiprocessing.Queue()
+	a2p_q = multiprocessing.Queue()
 	alg_node = Algorithm((fb_q, a2p_q))
 	alg_node.daemon = True #set as daemon process
-	alg_node.start()
+	exec_watch(alg_node, hook=disp_exit, fatal=True)
+	# alg_node.start()
 	# plugin Alg. Node feedback
 	fbHandle = threading.Thread(target=fbThread, args=(fb_q, ))
 	fbHandle.setDaemon(True)
@@ -199,8 +168,11 @@ def disp_init():
 	pass
 
 def disp_exit():
-	alg_node.terminate()
-	exit()
+	global alg_node
+	if alg_node.is_alive():
+		alg_node.terminate()
+		pass
+	os._exit(0)
 	pass
 
 def fbThread(fb_q):
@@ -234,17 +206,17 @@ def main():
 
 	while True:
 		sock, addr = skt.accept()
-		t = threading.Thread(target=tcplink, args=(sock, addr))
+		t = threading.Thread(target=tcplink, args=(sock, addr[0]))
 		t.setDaemon(True)
 		t.start()
 		pass
 	pass
 
 if __name__ == '__main__':
-	with open('../config.json') as cf:
+	with open('config.json') as cf:
 		config = json.load(cf)
 
-	print("Dispatcher is now online...")
+	printh('Dispatcher', "Dispatcher is now online...", 'green')
 	try:
 		main()
 	except Exception as e:

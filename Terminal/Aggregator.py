@@ -8,16 +8,7 @@ import json, binascii, struct
 import threading, multiprocessing
 from sys import maxint
 from time import ctime, sleep, time
-
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]
-		pass
-	return op, cmd
-	pass
+from Utility.Utility import cmd_parse, printh
 
 def build_frame(status, ftype='', fdata=''):
 	if status:
@@ -52,16 +43,20 @@ class Aggregator(multiprocessing.Process):
 			'type':self.setType
 		}
 
-		with open('../config.json') as cf:
+		with open('config.json') as cf:
 		 	self.config = json.load(cf)
 			pass
 		# RingBuffer Init
 		# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
 		self.ringBuffer = [0] * self.config['sWindow_rx']
-		self.init_ringbuffer()
 		pass
 
 	def class_init(self):
+		self.init_ringbuffer()
+		# feedback init
+		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
+		self.redist_q = Queue.Queue()
+		self.fb_q = Queue.Queue()
 		#Thread Handle Init
 		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, args=('wifi', self.config['stream_wifi_port']))
 		self.wifiRecvHandle.setDaemon(True)
@@ -79,12 +74,8 @@ class Aggregator(multiprocessing.Process):
 		self.uplinkHandle.setDaemon(True)
 		self.procHandle = threading.Thread(target=self.processThread, args=())
 		self.procHandle.setDaemon(True)
-
-		# feedback init
-		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
-		self.redist_q = Queue.Queue()
-		self.fb_q = Queue.Queue()
 		pass
+
 	'''
 	Process Helper Function
 	'''
@@ -281,14 +272,14 @@ class Aggregator(multiprocessing.Process):
 	def agg_exit(self):
 		#close socket here
 		#terminate thread here
-		print("Aggregator now exit...")
+		printh('Aggregator', "Now exit...", 'red')
 		exit()
 		pass
 
 	def run(self):
-		self.class_init()
-
 		try:
+			self.class_init()
+
 			while True:
 				if not self.p2c_q.empty():
 					data = self.p2c_q.get_nowait()
@@ -297,5 +288,6 @@ class Aggregator(multiprocessing.Process):
 					pass
 				pass
 		except Exception as e:
-			raise e
-		pass
+			print(e) #for debug
+		finally:
+			self.agg_exit()

@@ -4,65 +4,17 @@ Terminal: for command manipulation
 @author: Mark Hong
 '''
 
-from Aggregator import Aggregator
+from Terminal.Aggregator import Aggregator
+from Utility.Utility import *
 
-import json, math
+import os, json
 import socket, string, binascii
 import threading, multiprocessing
 from optparse import OptionParser
 
 global config, options
 global ops_map, src_type
-global processor, p2c_q, c2p_q
-global skt_req, skt_res
-
-'''
-Process Helper Function
-'''
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]
-		pass
-	return op, cmd
-	pass
-
-def response(status, sock, optional=''):
-	if status:
-		frame = '+'
-	else:
-		frame = '-'
-
-	if optional != '':
-		frame += optional
-	
-	skt_res.send(frame)
-	pass
-
-def request(frame, timeout=None):
-	skt_req.settimeout(timeout)
-	skt_req.send(frame)
-	data = skt_req.recv(1024)
-	status = True if data=='+' else False
-	skt_req.settimeout(None)
-	return status, data[1:]
-	pass
-
-def exec_nowait(cmd):
-	while not c2p_q.empty():
-		c2p_q.get()
-		pass
-	p2c_q.put_nowait(cmd)
-	pass
-
-def exec_wait(cmd):
-	while not c2p_q.empty():
-		c2p_q.get()
-		pass
-	p2c_q.put(cmd)
-	return c2p_q.get()
+global processor, skt_req, skt_res
 
 '''
 Process Command Function
@@ -75,7 +27,8 @@ def start_recv_op(cmd, sock):
 	# false exists here
 	fhash, fsize, flength = cmd
 	cmd = ['set'] + cmd + [src_type]
-	res = exec_wait(cmd)
+	print(cmd)
+	res = se.exec_wait(cmd)
 
 	response(True, sock)
 	pass
@@ -94,24 +47,36 @@ Process Internal Function
 '''
 def tcplink(sock, addr):
 	while True:
-		data = sock.recv(1024)
-		op, cmd = cmd_parse(data)
 		try:
+			data = sock.recv(1024)
+			op, cmd = cmd_parse(data)
 			ops_map[op](cmd, sock, addr)
 		except Exception as e:
-			response(False, sock)
+			try:
+				response(False, sock)
+			except Exception as e:
+				printh('Terminal', 'Link Broken!', 'red')
+				raise e
+			finally:
+				exit()
+			raise e
 			pass
 		pass
 	pass
 
 def term_exit():
-	#terminate thread here
-	request('exit -1', 3)
-	exit()
+	try:
+		#terminate threads here
+		processor.terminate()
+		request('exit -1', skt_req, 3)
+	except Exception as e:
+		pass
+	finally:
+		os._exit(0)
 	pass
 
 def term_init():
-	global skt_req, skt_res, processor, p2c_q, c2p_q, ops_map, src_type
+	global se, skt_req, skt_res, processor, p2c_q, c2p_q, ops_map, src_type
 
 	src_type = 'r' #'r' for relay, 'c' for cache
 	ops_map = {
@@ -132,22 +97,24 @@ def term_init():
 
 	# Register Procedure
 	init_cmd = ('%s %s %s 0'%('add', options.wifi, options.vlc))
-	status, fb_port = request(init_cmd, 3) #block until feedback
+	status, fb_port = request(init_cmd, skt_req, 3) #block until feedback
 	fb_port = int(fb_port)
 	sock, addr = skt_res.accept() #accepet reverse TCP link
 	
 	# Init Aggregator Process
 	p2c_q = multiprocessing.Queue() #Parent to Child Queue
 	c2p_q = multiprocessing.Queue() #Child to Parent Queue
-	queue = (p2c_q, c2p_q)
-	processor = Aggregator(queue, (options.server, fb_port))
+	se = SyncExecutor(p2c_q, c2p_q)
+	processor = Aggregator((p2c_q, c2p_q), (options.server, fb_port))
 	processor.daemon = True
 
 	# Run NOW
-	print('[Terminal] Connected with uplink port %d.'%(fb_port))
-	processor.start()
+	printh('Terminal', 'Connected with uplink port %d.'%(fb_port), 'green')
+	exec_watch(processor, hook=term_exit, fatal=True)
 	t = threading.Thread(target=tcplink, args=(sock, addr[0]))
-	t.start()
+	t.setDaemon(True)
+	exec_watch(t, hook=term_exit, fatal=True)
+	#t.start()
 	pass
 
 
@@ -163,7 +130,7 @@ def main():
 	pass
 
 if __name__ == '__main__':
-	with open('../config.json') as cf:
+	with open('config.json') as cf:
 		config = json.load(cf)
 		pass
 

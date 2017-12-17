@@ -6,19 +6,12 @@ Dispatcher: for data flow manipulation
 import json, random, string, crcmod
 import thread, socket, Queue
 import binascii, struct, ctypes
+import multiprocessing
 from time import sleep, ctime
-from multiprocessing import Process
 
 from StreamSource import StreamSource
+from Utility.Utility import cmd_parse, printh
 
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ', 1)
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]
-		pass
-	return op, cmd
 
 class QueueCoder:
 	"""docstring for QueueCoder"""
@@ -109,7 +102,7 @@ class QueueCoder:
 		print(self.count)
 		return True
 
-class Distributor(Process):
+class Distributor(multiprocessing.Process):
 	"""Non-Blocking running Distributor Process
 		@desc 
 		@var source:
@@ -121,15 +114,14 @@ class Distributor(Process):
 
 	def __init__(self, task_id, char, queue):
 		#1 Internal Init
-		Process.__init__(self)
+		multiprocessing.Process.__init__(self)
 		self.config = {}
 		self.task_id = task_id
 		self.p2c_q, self.c2p_q, self.fb_q = queue
 		self.wifi_ip, self.vlc_ip, self.fb_port = char
-		with open('../config.json') as cf:
+		with open('config.json') as cf:
 		 	self.config = json.load(cf)
 			pass
-
 		#2 plugin Source Init
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
 		self.src = StreamSource(["static", data]) #udp/file_p/static
@@ -188,10 +180,9 @@ class Distributor(Process):
 		cmd = cmd[0].split(' ')
 		if self.src.config(cmd): #True for Restart
 			self.encoder.clearAll()
-			fhash = self.src.data.data_gethash_op()
-			fsize = self.src.data.data_getsize_op()
+			fname, fhash, fsize = self.src.data.char
 			flength = self.src.length
-			frame = 'src-now %d %d %d'%(fhash, fsize, flength) #notify Rx side
+			frame = 'src-now %s %d %d %d'%(fname, fhash, fsize, flength) #notify Rx side
 			return self.response(True, frame)
 		return self.response(False)
 
@@ -271,7 +262,7 @@ class Distributor(Process):
 	def dist_stop(self):
 		#close socket here
 		#terminate thread here
-		print("<%s-%d> now exit..."%("Client", self.task_id))
+		printh('%s %d'%("Client", self.task_id), "Now exit...", 'red')
 		exit()
 		pass
 
