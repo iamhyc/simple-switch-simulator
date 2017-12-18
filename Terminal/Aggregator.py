@@ -4,7 +4,7 @@ Aggregator: for data flow manipulation
 @author: Mark Hong
 '''
 import socket, Queue
-import json, binascii, struct
+import json, binascii, struct, math
 import threading, multiprocessing
 from sys import maxint
 from time import ctime, sleep, time
@@ -51,13 +51,7 @@ class Aggregator(multiprocessing.Process):
 		self.ringBuffer = [0] * self.config['sWindow_rx']
 		pass
 
-	def class_init(self):
-		self.init_ringbuffer()
-		# feedback init
-		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
-		self.redist_q = Queue.Queue()
-		self.fb_q = Queue.Queue()
-		#Thread Handle Init
+	def thread_init(self):
 		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, args=('wifi', self.config['stream_wifi_port']))
 		self.wifiRecvHandle.setDaemon(True)
 
@@ -72,8 +66,19 @@ class Aggregator(multiprocessing.Process):
 
 		self.uplinkHandle = threading.Thread(target=self.uplinkThread, args=(self.fb_q, ))
 		self.uplinkHandle.setDaemon(True)
-		self.procHandle = threading.Thread(target=self.processThread, args=())
+
+		self.procHandle = threading.Thread(target=self.processThread, args=(self.redist_q, ))
 		self.procHandle.setDaemon(True)
+		pass
+
+	def class_init(self):
+		# feedback init
+		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
+		self.fb_q = Queue.Queue()
+		self.redist_q = Queue.Queue()
+		# Thread Handle Init
+		self.init_ringbuffer()
+		self.thread_init()
 		pass
 
 	'''
@@ -96,23 +101,23 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def setParam(self, cmd):
-		proc_stop()
-		redist_stop()
-
-		self.fhash, fsize, flength, self.src_type = cmd
+		self.proc_stop()
+		self.redist_stop()
+		self.init_ringbuffer()
+		#setup parameter
+		self.src_type, self.fhash, fsize, flength = cmd
 		self.size = int(fsize)
 		flength = float(flength)
-
-		self.numB = math.ceil(fsize / flength) - 1
-		if self.numB<0:
+		#setup endpoint
+		self.numB = math.ceil(self.size / flength) - 1
+		if self.numB<=0:#endless
 			self.numB = maxint
 			pass
-
 		#self.remains = self.size - self.numB*flength #zeros in last packet
-		
-		redist_start()
-		proc_start()
-		response(True)
+		self.thread_init()
+		self.redist_start()
+		self.proc_start()
+		self.response(True)
 		pass
 
 	def setType(self, src_type):
@@ -122,27 +127,36 @@ class Aggregator(multiprocessing.Process):
 
 	def redist_stop(self):
 		self.redist_paused = True
+		if self.redistFileHandle.is_alive():
+			self.redistFileHandle.join()
+		if self.redistUDPHandle.is_alive():
+			self.redistUDPHandle.join()
 		self.redist_q.queue.clear()
+		pass
+
+	def proc_stop(self):
+		self.proc_paused = True
+		if self.wifiRecvHandle.is_alive():
+			self.wifiRecvHandle.join()
+		if self.vlcRecvHandle.is_alive():
+			self.vlcRecvHandle.join()
+		if self.procHandle.is_alive():
+			self.procHandle.join()
 		pass
 
 	def redist_start(self):
 		self.redist_paused = False
 		if self.src_type=='r':
-			self.redistUDPThread.start()
+			self.redistUDPHandle.start()
 		else:
 			self.redistFileHandle.start()
-		pass
-
-	def proc_stop(self):
-		self.proc_paused = True
-		self.init_ringbuffer()
 		pass
 
 	def proc_start(self):
 		self.proc_paused = False
 		self.wifiRecvHandle.start()
 		self.vlcRecvHandle.start()
-		if not self.src_type=='r':
+		if self.src_type=='r':
 			self.procHandle.start()
 		pass
 
@@ -201,36 +215,42 @@ class Aggregator(multiprocessing.Process):
 	def RecvThread(self, name, port):
 		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		recv_skt.bind(('', port))
+		recv_skt.setblocking(False)
+		printh(name.upper(), 'Now on', 'green')
 
-		while self.proc_paused:
-			last_time = time()
-			raw, addr = recv_skt.recvfrom(4096)
+		while not self.proc_paused:
+			try:
+				last_time = time()
+				raw, addr = recv_skt.recvfrom(4096)
 
-			if self.src_type=='r':
-				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
-				data_len = len(Data)
-				#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
-				ptr = Seq % self.config['sWindow_rx']
-				if ringBuffer[ptr][0] != Seq:
-					ringBuffer[ptr] = [Seq, Size - data_len, [chr(0)]*Size]
-					ringBuffer[ptr][2][Offset:Offset+data_len] = Data
+				if self.src_type=='r':
+					(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
+					data_len = len(Data)
+					#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
+					ptr = Seq % self.config['sWindow_rx']
+					if self.ringBuffer[ptr][0] != Seq:
+						self.ringBuffer[ptr] = [Seq, Size - data_len, [chr(0)]*Size]
+						self.ringBuffer[ptr][2][Offset:Offset+data_len] = Data
+						pass
+					else:
+						self.ringBuffer[ptr][2][Offset:Offset+data_len] = Data
+						self.ringBuffer[ptr][1] -= data_len
+						pass
 					pass
-				else:
-					ringBuffer[ptr][2][Offset:Offset+data_len] = Data
-					ringBuffer[ptr][1] -= data_len
+				else: #src_type=='c'
+					self.redist_q.put_nowait(raw)
 					pass
-				pass
-			else: #src_type=='c'
-				self.redist_q.put_nowait(raw)
-				pass
 
-			rate_inst = data_len / time() - last_time
-			feedback(True, name, '%d'%(rate_inst))
+				rate_inst = data_len / time() - last_time
+				feedback(True, name, '%d'%(rate_inst))
+				pass
+			except Exception as e:
+				pass
 			pass
 		pass
 
-	def processThread(self): #for relay only
-		while ringBuffer[0][0] != self.numA:
+	def processThread(self, redist_q): #for relay only
+		while self.ringBuffer[0][0] != self.numA and not self.proc_paused:
 			sleep(0.1) # wait
 			pass
 
@@ -239,13 +259,13 @@ class Aggregator(multiprocessing.Process):
 		while cnt <= self.numB and not self.proc_paused:
 			ptr = (cnt % self.config['sWindow_rx'])
 			if time()-timeout < self.config['Atimeout']:
-				if ringBuffer[ptr][0] == cnt: #assume: writing not over reading
+				if self.ringBuffer[ptr][0] == cnt: #assume: writing not over reading
 					timeout = time() # subpacket time counter
 
 					sub_verified = False
 					while time()-timeout < self.config['Btimeout']:
-						if ringBuffer[ptr][1] == 0:
-							redist_q.put_nowait(''.join(ringBuffer[ptr][2]))
+						if self.ringBuffer[ptr][1] == 0:
+							redist_q.put_nowait(''.join(self.ringBuffer[ptr][2]))
 							sub_verified = True
 							break
 						pass
@@ -283,7 +303,7 @@ class Aggregator(multiprocessing.Process):
 			while True:
 				if not self.p2c_q.empty():
 					data = self.p2c_q.get_nowait()
-					op, cmd = cmd_parse(data)
+					op, cmd = data[0], data[1:]
 					self.ops_map[op](cmd)
 					pass
 				pass

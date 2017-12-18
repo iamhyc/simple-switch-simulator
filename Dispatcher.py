@@ -85,7 +85,7 @@ def set_source_op(cmd, sock, addr):
 		res = proc_map[task_id]['se'].exec_wait(p2c_cmd)
 		if res[0]=='+': # need notify Terminal side
 			frame = res[1:]
-			request(frame, proc_map[task_id]['req_sock'])
+			status, res = request(frame, proc_map[task_id]['req_sock'])
 			print('notified %d'%(task_id))
 			pass
 		response(True, sock) # to Controller Side

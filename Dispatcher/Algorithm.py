@@ -1,5 +1,5 @@
 #! /usr/bin/python
-
+from Utility.Utility import printh
 from multiprocessing import Process, Queue
 import threading
 from time import sleep
@@ -62,7 +62,7 @@ class Algorithm(Process):
 	Process Entrance Function
 	'''
 	def alg_start(self):
-		print('Algorithm Node is online...')
+		printh('Algorithm', 'Algorithm is now online...', 'green')
 		#3 Thread Handle Init
 		self.applyHandle = threading.Thread(target=self.applyThread, args=(5.0,))
 		self.applyHandle.setDaemon(True)
@@ -73,7 +73,7 @@ class Algorithm(Process):
 		pass
 
 	def alg_exit(self):
-		print("<%s> now exit..."%("Algorithm node"))
+		printh('Algorithm', "Now exit...", 'red')
 		exit()
 		pass
 
@@ -87,7 +87,7 @@ class Algorithm(Process):
 					pass
 				pass
 		except Exception as e:
-			print(e) #for debug
+			printh('Algorithm', e, 'red') #for debug
 			pass
 		finally:
 			self.alg_exit()

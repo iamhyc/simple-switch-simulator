@@ -71,7 +71,7 @@ def main():
 				pass
 			elif op=='now' and len(cmd)>=1:
 				#'<command> <task_id> <type> <data>'
-				tmp = ('%s %s %s %s'%('src-now', cmd[0]))
+				tmp = ('%s %s'%('src-now', cmd[0]))
 				status, data = request(tmp, skt, 3)
 				print(status)
 				pass
@@ -93,7 +93,7 @@ def main():
 				quit()
 				pass
 			else:
-				cprint("Not Supported Format or Command.", 'red')
+				printh(op, 'Command Format Error', 'red')
 			pass
 		except Exception as e:
 			#raise e #for debug

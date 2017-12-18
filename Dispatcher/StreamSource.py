@@ -9,6 +9,7 @@ from os.path import getsize
 from sys import maxint
 from time import ctime, sleep
 from urllib2 import urlopen
+from Utility.Utility import printh
 
 def zeroPadding(length, data):
 	raw_len = len(data)
@@ -29,6 +30,7 @@ class udp_ops_class:
 		self.char = ('udp', self.hashcode, self.size)
 
 		self.skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		self.skt.setblocking(False)
 		self.skt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
 		#self.skt.setblocking(0)
 		self.skt.bind(('', self.port))
@@ -124,12 +126,16 @@ class StreamSource:
 		self.data = self.src_map[src[0]](src[1])
 		pass
 
+	def thread_init(self):
+		self.sourceHandle = threading.Thread(target=self.readThread, args=())
+		self.sourceHandle.setDaemon(True)
+		pass
+
 	def class_init(self):
 		# Source Buffer
 		self.buffer = Queue.Queue()
 		# Source Buffer Handle
-		self.sourceHandle = threading.Thread(target=self.readThread, args=())
-		self.sourceHandle.setDaemon(True)
+		self.thread_init()
 		pass
 
 	def config(self, cmd):
@@ -165,11 +171,15 @@ class StreamSource:
 	'''
 	def start(self):
 		self.paused = False
+		self.thread_init()
 		self.sourceHandle.start()
+		printh('Source', 'Now start...', 'green')
 		pass
 
 	def stop(self):
 		self.paused = True
+		if self.sourceHandle.is_alive():
+			self.sourceHandle.join()
 		pass
 
 	def empty(self):

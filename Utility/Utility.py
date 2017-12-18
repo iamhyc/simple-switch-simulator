@@ -53,7 +53,11 @@ def exec_watch(process, hook=None, fatal=False, gen=True):
 	pass
 
 def printh(tip, cmd, color=None):
-	cprint('[%s] %s'%(tip, cmd), color)
+	print(
+		colored('[%s] '%(tip), 'magenta') 
+		+ colored(cmd, color)
+		+ ' '
+		)
 	pass
 
 class AlignExecutor:

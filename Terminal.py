@@ -24,10 +24,13 @@ def status_print_op(cmd, sock):
 	pass
 
 def start_recv_op(cmd, sock):
-	# false exists here
-	fhash, fsize, flength = cmd
-	cmd = ['set'] + cmd + [src_type]
-	print(cmd)
+	ftype, fhash, fsize, flength = cmd
+	#setup default redistribution type
+	if ftype=='udp' or ftype=='static':
+		src_type = 'r'
+	else:
+		src_type = 'c'
+	cmd = ['set', src_type, fhash, fsize, flength]
 	res = se.exec_wait(cmd)
 
 	response(True, sock)
@@ -50,7 +53,7 @@ def tcplink(sock, addr):
 		try:
 			data = sock.recv(1024)
 			op, cmd = cmd_parse(data)
-			ops_map[op](cmd, sock, addr)
+			ops_map[op](cmd, sock)
 		except Exception as e:
 			try:
 				response(False, sock)
@@ -152,7 +155,7 @@ if __name__ == '__main__':
 	try: #cope with Interrupt Signal
 		main()
 	except Exception as e:
-		print(e) #for debug
+		printh('Terminal', e, 'red') #for debug
 		pass
 	finally:
 		term_exit()
