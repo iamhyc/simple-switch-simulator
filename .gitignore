@@ -1,1 +1,4 @@
 *.pyc
+Dispatcher/files/*
+Terminal/files/*
+config.json

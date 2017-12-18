@@ -1,11 +1,11 @@
 #! /usr/bin/python
-import os, time, json
+from Utility.Utility import *
 from getpass import getuser
 import platform as pt
-import socket
+import os, time, json, socket
 
 global localuser, remote_cmdip
-global config
+global skt, config
 
 win_pt = "windows" in pt.platform().lower()
 
@@ -22,57 +22,64 @@ def helper():
 	print("                 [ADD]   Add a Client							")
 	print("                 [RM]    Remove a Client							")
 	print("                 [SW]    Switch a Client Link					")
+	print("                 [SRC]   Change a Client Source					")
+	print("                 [NOW]   Start a Client Source					")
 	print("                 [SC]    Execute Script File						")
 	print("                 [CLS]   Clear screen							")
 	print("                 [EXIT]  Exit									")
 	print
 	pass
 
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]	
-		pass
-	return op, cmd
-	pass
-
 def script_file(file):
 	pass
 
 def main():
-	skt_cmd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_recv.settimeout(3.0)#3 seconds
-	skt_recv.bind(('', config['udp_client_port']))
+	global skt
+	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+	try:
+		skt.connect(('localhost', config['converg_disp_port']))
+	except Exception as e:
+		cprint('bye', 'red')
+		time.sleep(0.5)
+		raise e
 
 	_cls()
 	helper()
 	while True:
-		tipstr = localuser+"@Aggregator:["+time.ctime()+"]$ "
+		tipstr = colored(localuser+" @ Aggregator:["+time.ctime()+"]\n$ ", 'cyan')
 		op, cmd = cmd_parse(raw_input(tipstr))
 
 		try:
 			if op=='ls':
-				skt_cmd.sendto('ls', (remote_cmdip, config['udp_server_port']))
-				data, ADDR = skt_recv.recvfrom(1024)
+				status, data = request('ls', skt, 3)
 				_cls()
-				print("%s\n"%(data))
+				cprint("%s\n"%(data), 'green')
 				helper()
 				pass
 			elif op=='add' and len(cmd)>=2:
 				#'<command> <ip1> <ip2>'
-				tmp = ('%s %s %s'%('add', cmd[0], cmd[1]))
-				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
-				data, ADDR = skt_recv.recvfrom(1024) #receive port allocation
-				print(tmp)
+				tmp = ('%s %s %s 1'%('add', cmd[0], cmd[1]))
+				status, data = request(tmp, skt, 3)
+				print(status)
+				pass
+			elif op=='src' and len(cmd)>=3:
+				#'<command> <task_id> <type> <data>'
+				tmp = ('%s %s %s %s'%('src-set', cmd[0], cmd[1], cmd[2]))
+				status, data = request(tmp, skt, 3)
+				print(status)
+				pass
+			elif op=='now' and len(cmd)>=1:
+				#'<command> <task_id> <type> <data>'
+				tmp = ('%s %s'%('src-now', cmd[0]))
+				status, data = request(tmp, skt, 3)
+				print(status)
 				pass
 			elif op=='rm' or op=='kill' and len(cmd)>=1:
 				#'<command> <task_id>'
-				tmp = ('%s %s'%("rm", cmd[0]))
-				skt_cmd.sendto(tmp, (remote_cmdip, config['udp_server_port']))
-				print(tmp)
+				tmp = ('%s %s'%("exit", cmd[0]))
+				status, data = request(tmp, skt, 3)
+				print(status)
 				pass
 			elif op=='sc' and len(cmd)>=1:
 				script_file(cmd[1])
@@ -86,11 +93,11 @@ def main():
 				quit()
 				pass
 			else:
-				print("\t\tNot Supported Format or Instruction...\n")
+				printh(op, 'Command Format Error', 'red')
 			pass
 		except Exception as e:
-			#raise e ##for debug
-			print("...")
+			#raise e #for debug
+			cprint("...", 'red')
 			pass
 		pass
 	pass
@@ -106,5 +113,6 @@ if __name__ == '__main__':
 		main()
 	except Exception as e:
 		_cls()
+		pass
 	finally:
 		exit()

@@ -3,7 +3,7 @@
 Aggregator: for data flow manipulation
 @author: Mark Hong
 '''
-import json, random, string
+import json, random, string, struct
 import socket
 from optparse import OptionParser
 
@@ -11,6 +11,9 @@ global config, options
 
 def main():
 	skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	max_size = 4096 - struct.Struct(config['struct']).size
+	options.len = max_size if options.len>max_size else options.len
+
 	while True:
 		raw_input('Tap to continue...')
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in range(options.len))

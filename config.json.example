@@ -1,0 +1,21 @@
+{
+	"layers":["Content", "Convergence", "Stream"],
+
+	"content_server_port":12580,
+	"content_client_port":12306,
+
+	"converg_disp_port":11110,
+	"converg_term_port":11111,
+
+	"stream_src_port":10086,
+	"stream_uplink_port":"__Dynamic Assignate__",
+	"stream_wifi_port":11112,
+	"stream_vlc_port_tx":11113,
+	"stream_vlc_port_rx":11113,
+
+	"struct":"IHHH",
+	"sWindow_tx":7000,
+	"sWindow_rx":1000,
+	"Atimeout":0.30,
+	"Btimeout":0.10
+}

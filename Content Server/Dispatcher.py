@@ -1,131 +1,207 @@
 #! /usr/bin/python
 '''
-Dispatcher: 
-	[convergence layer] for instruction manipulation
-	accept from: Console.py, Publisher.py, Algorithm, Aggregator.py
+Dispatcher: for command manipulation
 @author: Mark Hong
 '''
-import json
-from time import sleep, ctime
-from multiprocessing import Process, Queue
-import socket, string, binascii
+import threading, multiprocessing
+import os, json, string, binascii, socket
 
-from Distributor import Distributor
-from Algorithm import Algorithm
+from Dispatcher.Distributor import Distributor
+from Dispatcher.Algorithm import Algorithm
+from Utility.Utility import *
 
 global config
-global skt_res, skt_req
-global proc_map, ops_map
+global proc_map, proc_remap
 global ClientCount
-global alg_node, fb_q, c2p_q
+global alg_node, fb_q, a2p_q
 
 ALLOC_PORT_BASE = 20000
 
-def cmd_parse(str):
-	cmd = ''
-	op_tuple = str.lower().split(' ')
-	op = op_tuple[0]
-	if len(op_tuple) > 1:
-		cmd = op_tuple[1:]
+'''
+Process Command Function
+'''
+def process_print_op(cmd, sock, addr):
+	proc_list = ''
+	for (k,v) in proc_map.items():
+		data = proc_map[k]['se'].exec_wait('src-get')
+		status, src_char = data[0], data[1:]
+		proc_list += '%s\t%s\n'%(k, v['char']) + '\t%s\n'%(src_char)
 		pass
-	return op, cmd
+	response(True, sock, proc_list)
 	pass
 
-def process_print(cmd, addr):
-	proc_list = ''.join( ('%s %s\n')%(k, v['char']) for (k,v) in proc_map.items())
-	skt_res.sendto(proc_list, (addr, config['udp_client_port']))
+def dist_exit_op(cmd, sock, addr):
+	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
+
+	if not proc_map.has_key(task_id):
+		raise Exception('hehe')
+
+	proc_map[task_id]['thread'].terminate() #forcely exit the server
+	del proc_map[task_id] # delete the item
+
+	response(True, sock)
+	printh('Dispatcher', 'Client %d exit.'%(task_id), 'red')
 	pass
 
-def add_client(cmd, addr):
+def register_client_op(cmd, sock, addr):
 	global ClientCount
 
-	wifi_ip, vlc_ip = cmd
+	wifi_ip, vlc_ip, rc = cmd
 	task_id = ClientCount #allocate task_id
 	port = ALLOC_PORT_BASE + ClientCount #allocate port nubmer
 
-	p2c_q = Queue() #Parent to Child Queue
+	p2c_q = multiprocessing.Queue() #Parent to Child Queue
+	c2p_q = multiprocessing.Queue() #Child to Parent Queue
 
+	proc_remap[wifi_ip] = task_id #revese map over Wi-Fi link
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
-	proc_map[task_id]['queue'] = (p2c_q, fb_q)
-	proc_map[task_id]['_thread'] = Distributor(
+	proc_map[task_id]['res_sock'] = sock
+	proc_map[task_id]['se'] = AlignExecutor(p2c_q, c2p_q)
+	proc_map[task_id]['queue'] = (p2c_q, c2p_q, fb_q)
+	proc_map[task_id]['thread'] = Distributor(
 									task_id,
 									proc_map[task_id]['char'], 
 									proc_map[task_id]['queue']
 								)
-	proc_map[task_id]['_thread'].daemon = True #set as daemon process
-	proc_map[task_id]['_thread'].start()
+	proc_map[task_id]['thread'].daemon = True #set as daemon process
+	proc_map[task_id]['thread'].start()
+	#default source with `unique` <static> data, and wait to trigger
 
-	skt_res.sendto(str(port), (addr, config['udp_client_port']))
-	print('Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
+	response(True, sock, str(port))
+	if rc == '0':
+		proc_map[task_id]['req_sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		proc_map[task_id]['req_sock'].connect((addr, config['converg_term_port']))
+		pass
+	printh('Dispatcher', 'Client %d on (%s %s %d)...'%(ClientCount, wifi_ip, vlc_ip, port))
 
 	ClientCount += 1
 	pass
 
-def remove_client(cmd, addr):
-	task_id = cmd[0]
-	if not proc_map.has_key(task_id):
-		raise Exception
-
-	#proc_map[task_id].join() # wait for itself exit
-	proc_map[task_id]['_thread'].terminate() #forcely exit the server
-	del proc_map[task_id] # delete the item
-
-	skt_res.sendto('1', (addr, config['udp_client_port']))
+def set_source_op(cmd, sock, addr):
+	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
+	if proc_map.has_key(task_id):
+		p2c_cmd = ' '.join(['src-set'] + cmd[1:])
+		res = proc_map[task_id]['se'].exec_wait(p2c_cmd)
+		if res[0]=='+': # need notify Terminal side
+			frame = res[1:]
+			status, res = request(frame, proc_map[task_id]['req_sock'])
+			print('notified %d'%(task_id))
+			pass
+		response(True, sock) # to Controller Side
+		pass
+	else:
+		response(False, sock)
+		pass
 	pass
 
+def start_source_op(cmd, sock, addr):
+	task_id = proc_remap[addr] if cmd[0] == '-1' else int(cmd[0]) #-1 for no id
+	if proc_map.has_key(task_id):
+		p2c_cmd = 'src-now'
+		res = proc_map[task_id]['se'].exec_wait(p2c_cmd)
+		response(True, sock)
+		pass
+	else:
+		response(False, sock)
+		pass
+	pass
+
+def idle_work_op(cmd, sock, addr):
+	response(True, sock)
+	pass
+
+'''
+Process Internal Function
+'''
 def disp_init():
-	global skt_req, skt_res, fb_q, c2p_q, alg_node, ClientCount
+	global skt, fb_q, a2p_q, alg_node, ClientCount, proc_map, proc_remap, ops_map, fbHandle
 
-	skt_res = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_req = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	skt_req.bind(('', config['udp_server_port']))
-
+	# Map Init
+	proc_map = {}
+	proc_remap = {}
+	ops_map = {
+		# General Operation
+		"ls":process_print_op,
+		"add":register_client_op,
+		# Specific Operation
+		"src-set":set_source_op,
+		"src-now":start_source_op,
+		"idle":idle_work_op,
+		"exit":dist_exit_op,
+	}
+	# converg Socket Init
+	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	skt.bind(('', config['converg_disp_port']))
+	skt.listen(10)
+	# plugin Alg. Node Init
 	ClientCount = 0
-	fb_q = Queue()
-	c2p_q = Queue()
-	alg_node = Algorithm((fb_q, c2p_q))
+	fb_q = multiprocessing.Queue()
+	a2p_q = multiprocessing.Queue()
+	alg_node = Algorithm((fb_q, a2p_q))
 	alg_node.daemon = True #set as daemon process
-	alg_node.start()
+	exec_watch(alg_node, hook=disp_exit, fatal=True)
+	# alg_node.start()
+	# plugin Alg. Node feedback
+	fbHandle = threading.Thread(target=fbThread, args=(fb_q, ))
+	fbHandle.setDaemon(True)
+	fbHandle.start()
 	pass
 
 def disp_exit():
-	alg_node.terminate()
-	exit()
+	global alg_node
+	if alg_node.is_alive():
+		alg_node.terminate()
+		pass
+	os._exit(0)
 	pass
 
-def main():
-	disp_init()
+def fbThread(fb_q):
 	while True:
-		#skt_req.settimeout(15) #for debug
-		data, addr = skt_req.recvfrom(1024)
-		op, cmd = cmd_parse(data)
-		try:
-			ops_map[op](cmd, addr[0])
-		except Exception as e:
-			print('\nErrorCode: %s'%(e))
-			print('\"%s\" from %s'%(data, addr))
-			#skt_res.sendto(op+' Failed', (addr, config['udp_client_port']))
+		if not fb_q.empty():
+			frame = fb_q.get_nowait()
+			op, data = cmd_parse(frame)
+			task_id, ratio = data[0], data[1:]
+			exec_nowait()
 			pass
 		pass
 	pass
 
+def tcplink(sock, addr):
+	while True:
+		try:
+			data = sock.recv(1024)
+			op, cmd = cmd_parse(data)
+			ops_map[op](cmd, sock, addr)
+		except (socket.error, Exception) as e:
+			if e.message=='' : return
+			printh('Dispatcher', e, 'red')
+			response(False, sock)
+			pass
+		pass
+	pass
+
+def main():
+	disp_init()
+	# Converg Layer Dispatcher
+
+	while True:
+		sock, addr = skt.accept()
+		t = threading.Thread(target=tcplink, args=(sock, addr[0]))
+		t.setDaemon(True)
+		t.start()
+		pass
+	pass
+
 if __name__ == '__main__':
-	with open('../config.json') as cf:
+	with open('config.json') as cf:
 		config = json.load(cf)
 
-	proc_map = {}
-	ops_map = {
-		"ls":process_print,
-		"add":add_client,
-		"rm":remove_client
-	}
-
-	print("Dispatcher is now online...")
+	printh('Dispatcher', "Dispatcher is now online...", 'green')
 	try:
 		main()
 	except Exception as e:
-		raise e #for debug
+		#raise e #for debug
 		pass
 	finally:
 		disp_exit()
