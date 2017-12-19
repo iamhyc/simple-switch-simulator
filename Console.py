@@ -48,7 +48,7 @@ def main():
 	_cls()
 	helper()
 	while True:
-		tipstr = colored(localuser+" @ Aggregator:["+time.ctime()+"]\n$ ", 'cyan', 'on_grey')
+		tipstr = colored(localuser+" @ Aggregator:["+time.ctime()+"]\n$ ", 'cyan')
 		op, cmd = cmd_parse(raw_input(tipstr))
 
 		try:

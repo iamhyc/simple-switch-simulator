@@ -55,8 +55,7 @@ class QueueCoder:
 		for x in xrange(self.number):
 			tmp = seq % self.win_size
 			tmp_str = self.tx_window[tmp][x]
-			print(len(tmp_str), tmp_str)
-			if len(tmp_str):
+			if len(tmp_str) > 1:
 				self.tuple_q[x].appendleft(tmp_str)
 				pass
 			pass
