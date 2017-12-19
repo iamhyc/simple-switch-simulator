@@ -2,7 +2,7 @@
 '''
 Aggregator: for data flow manipulation
 @author: Mark Hong
-@level: debug
+@level: prerelease
 '''
 import socket, Queue
 import json, binascii, struct, math

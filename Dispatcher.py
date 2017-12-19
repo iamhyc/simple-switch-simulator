@@ -2,7 +2,7 @@
 '''
 Dispatcher: for command manipulation
 @author: Mark Hong
-@level: debug
+@level: prerelease
 '''
 import threading, multiprocessing
 import os, json, socket

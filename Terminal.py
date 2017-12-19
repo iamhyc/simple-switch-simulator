@@ -2,7 +2,7 @@
 '''
 Terminal: for command manipulation
 @author: Mark Hong
-@level: debug
+@level: prerelease
 '''
 
 from Terminal.Aggregator import Aggregator
