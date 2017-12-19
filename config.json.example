@@ -14,8 +14,8 @@
 	"stream_vlc_port_rx":11113,
 
 	"struct":"IHHH",
-	"sWindow_tx":7000,
-	"sWindow_rx":1000,
+	"sWindow_tx":1000,
+	"sWindow_rx":7E4,
 	"Atimeout":0.30,
 	"Btimeout":0.10
 }
