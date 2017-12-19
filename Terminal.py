@@ -2,12 +2,13 @@
 '''
 Terminal: for command manipulation
 @author: Mark Hong
+@level: debug
 '''
 
 from Terminal.Aggregator import Aggregator
 from Utility.Utility import *
 
-import os, json
+import os
 import socket, string, binascii
 import threading, multiprocessing
 from optparse import OptionParser
@@ -133,9 +134,7 @@ def main():
 	pass
 
 if __name__ == '__main__':
-	with open('config.json') as cf:
-		config = json.load(cf)
-		pass
+	config = load_json('./config.json')
 
 	parser = OptionParser()
 	parser.add_option("-s", "--server",

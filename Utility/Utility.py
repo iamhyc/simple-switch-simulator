@@ -4,8 +4,16 @@ Utility: useful function utilities
 @author: Mark Hong
 @level: release
 '''
-import threading
+import json, time, threading
 from termcolor import colored, cprint
+
+def load_json(uri):
+	try:
+		with open(uri) as cf:
+			return json.load(cf)
+	except Exception as e:
+		raise e
+	pass
 
 def cmd_parse(str):
 	cmd = ''
@@ -47,7 +55,9 @@ def exec_watch(process, hook=None, fatal=False, gen=True):
 		t.start()
 		pass
 	else:#internal loop
-		while process.is_alive(): pass
+		while process.is_alive():
+			time.sleep(0.1)
+			pass
 		if fatal and hook: hook()
 		pass
 	pass

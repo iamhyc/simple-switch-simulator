@@ -2,9 +2,10 @@
 '''
 Dispatcher: for command manipulation
 @author: Mark Hong
+@level: debug
 '''
 import threading, multiprocessing
-import os, json, string, binascii, socket
+import os, json, socket
 
 from Dispatcher.Distributor import Distributor
 from Dispatcher.Algorithm import Algorithm
@@ -149,9 +150,9 @@ def disp_init():
 	pass
 
 def disp_exit():
-	global alg_node
 	if alg_node.is_alive():
 		alg_node.terminate()
+		alg_node.join()
 		pass
 	os._exit(0)
 	pass
@@ -194,8 +195,7 @@ def main():
 	pass
 
 if __name__ == '__main__':
-	with open('config.json') as cf:
-		config = json.load(cf)
+	config = load_json('./config.json')
 
 	printh('Dispatcher', "Dispatcher is now online...", 'green')
 	try:

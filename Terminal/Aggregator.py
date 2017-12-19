@@ -2,13 +2,15 @@
 '''
 Aggregator: for data flow manipulation
 @author: Mark Hong
+@level: debug
 '''
 import socket, Queue
 import json, binascii, struct, math
 import threading, multiprocessing
+from os import path
 from sys import maxint
 from time import ctime, sleep, time
-from Utility.Utility import cmd_parse, printh
+from Utility.Utility import load_json, cmd_parse, printh, exec_watch
 
 def build_frame(status, ftype='', fdata=''):
 	if status:
@@ -42,10 +44,7 @@ class Aggregator(multiprocessing.Process):
 			'set':self.setParam,
 			'type':self.setType
 		}
-
-		with open('config.json') as cf:
-		 	self.config = json.load(cf)
-			pass
+		self.config = load_json('./config.json')
 		# RingBuffer Init
 		# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
 		self.ringBuffer = [0] * self.config['sWindow_rx']
@@ -109,7 +108,7 @@ class Aggregator(multiprocessing.Process):
 		self.size = int(fsize)
 		flength = float(flength)
 		#setup endpoint
-		self.numB = math.ceil(self.size / flength) - 1
+		self.numB = int(math.ceil(self.size / flength))
 		if self.numB<=0:#endless
 			self.numB = maxint
 			pass
@@ -142,6 +141,8 @@ class Aggregator(multiprocessing.Process):
 			self.vlcRecvHandle.join()
 		if self.procHandle.is_alive():
 			self.procHandle.join()
+		if self.uplinkHandle.is_alive():
+			self.uplinkHandle.join()
 		pass
 
 	def redist_start(self):
@@ -156,6 +157,7 @@ class Aggregator(multiprocessing.Process):
 		self.proc_paused = False
 		self.wifiRecvHandle.start()
 		self.vlcRecvHandle.start()
+		self.uplinkHandle.start()
 		if self.src_type=='r':
 			self.procHandle.start()
 		pass
@@ -164,9 +166,11 @@ class Aggregator(multiprocessing.Process):
 	Process Thread Function
 	'''
 	def uplinkThread(self, fb_q):
-		while not fb_q.empty:
-			frame = fb_q.get_nowait()
-			self.fb_skt.sendto(frame, self.fb_tuple)
+		while not self.proc_paused:
+			if not fb_q.empty():
+				frame = fb_q.get_nowait()
+				self.fb_skt.sendto(frame, self.fb_tuple)
+				pass
 			pass
 		pass
 
@@ -182,34 +186,46 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def redistFileThread(self, redist_q):
-		redist_fp = open(self.fhash, 'r+b')
+		redist_fp = open(path.join('Files', self.fhash), 'w+b')
 		#redist_fp.fillin(chr(0), self.size) #not needed
 
-		seq_map = [0] * self.numB
-		ptr, tot = 0, 2*self.numB
+		seq_map = [{'flag':False} for x in xrange(self.numB)]
+		ptr, tot = 0, self.numB
+
+		while not self.proc_paused and redist_q.empty():
+			sleep(0.1) # wait
+			pass
 
 		while not self.redist_paused and tot>0:
-			
 			while not redist_q.empty():
 				raw = redist_q.get_nowait()
+				#print('Redistributed Data: %s'%(raw)) #for debug
 				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
-				#print('Redistributed Data: %s'%(data))
+				seq_map[Seq][str(Offset)] = len(Data)
 				redist_fp.seek(Seq*Size + Offset)
 				redist_fp.write(Data)
 
-				if seq_map[Seq] < 2:
-					seq_map[Seq] += 1
+				if sum(seq_map[Seq].values())==Size:
+					seq_map[Seq]['flag'] = True
 					tot -=1
 					pass
 				pass
 
-			while ptr <= self.numB and seq_map[ptr]==2: ptr = (ptr+1) % (self.numB+1)
-			feedback(False, fdata=ptr) #retransmission
-			sleep(0.05) #wait for transmission
+			while ptr<self.numB and seq_map[ptr]['flag']:
+				print(ptr)
+				ptr = ptr + 1 #% (self.numB)
+				pass
+
+			if ptr<self.numB:
+				print('Loss: %d'%(ptr))
+				self.feedback(False, fdata=ptr) #retransmission
+				sleep(0.001) #wait for transmission
+				pass
 			pass
 		
 		redist_fp.truncate(self.size) #remove extra zeros
 		redist_fp.close()
+		printh('Aggregator', 'End of File', 'red')
 		pass
 
 	def RecvThread(self, name, port):
@@ -242,7 +258,7 @@ class Aggregator(multiprocessing.Process):
 					pass
 
 				rate_inst = data_len / time() - last_time
-				feedback(True, name, '%d'%(rate_inst))
+				self.feedback(True, name, '%d'%(rate_inst))
 				pass
 			except Exception as e:
 				pass

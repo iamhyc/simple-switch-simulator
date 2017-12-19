@@ -2,16 +2,17 @@
 '''
 Dispatcher: for data flow manipulation
 @author: Mark Hong
+@level: debug
 '''
-import json, random, string, crcmod
-import thread, socket, Queue
-import binascii, struct, ctypes
+import thread, socket
+import struct, ctypes
 import multiprocessing
+from collections import deque
 from time import sleep, ctime
 
 from StreamSource import StreamSource
-from Utility.Utility import cmd_parse, printh
-
+from Utility.Utility import cmd_parse, printh, load_json
+from Utility.Math import *
 
 class QueueCoder:
 	"""docstring for QueueCoder"""
@@ -22,14 +23,11 @@ class QueueCoder:
 		self.win_size = sWindow
 		self.count = 0
 		#(ring)Buffer Array as tx sliding window
-		self.tx_window = [0] * sWindow
-		for x in xrange(sWindow):
-			self.tx_window[x] = [chr(0)] * self.number
-			pass
+		self.tx_window = [[chr(0)] * self.number for x in xrange(sWindow)]
 		pass
 
 	def class_init(self):
-		self.crcGen = crcmod.predefined.Crc('crc-16')
+		self.crcGen = crcFactory('crc-16')
 		#Seq[4B] + Size[2B] + Offset[2B] + CRC16[2B] + Data
 		#Or: Tail_Flag[1b]|Seq[4B] + Order[1B] + CRC8[2B] + Data
 		self.frame = struct.Struct('IHHH') #Or, Struct('IBs')
@@ -46,17 +44,20 @@ class QueueCoder:
 
 	def clearAll(self):
 		for x in xrange(self.number):
-			self.tuple_q[x].queue.clear()
+			self.tuple_q[x].clear()
 		#del self.tx_window #dec reference counter
 		self.count = 0 #reset packet sequence
 		pass
 
 	def reput(self, seq):
+		printh('Encoder', 'reput %d'%(seq))
+		seq = seq % self.win_size
 		for x in xrange(self.number):
 			tmp = seq % self.win_size
 			tmp_str = self.tx_window[tmp][x]
+			print(len(tmp_str), tmp_str)
 			if len(tmp_str):
-				self.tuple_q[x].put_nowait(tmp_str)
+				self.tuple_q[x].appendleft(tmp_str)
 				pass
 			pass
 		pass
@@ -77,10 +78,9 @@ class QueueCoder:
 										raw_len,#total data size
 										data_ptr,#offset in subpacket
 										)
-				self.crcGen.update(self.crcBuffer)
-				#print(self.crcGen.crcValue) #for debug
+				crcValue = self.crcGen(self.crcBuffer)
 				self.frame.pack_into(self.buffer, 0, 
-									self.count, raw_len, data_ptr, self.crcGen.crcValue)
+									self.count, raw_len, data_ptr, crcValue)
 
 				header = ctypes.string_at(
 					ctypes.addressof(self.buffer),
@@ -91,15 +91,15 @@ class QueueCoder:
 			pass
 		#then, straightly push into each split queue
 		for x in xrange(self.number):
+			tmp = self.count % self.win_size
+			self.tx_window[tmp][x] = data[x]
 			if len(data[x]):
-				tmp = self.count % self.win_size
-				self.tx_window[tmp][x] = data[x]
-				self.tuple_q[x].put_nowait(data[x])
+				self.tuple_q[x].append(data[x])
 				pass
 			pass
 
-		self.count += 1
 		print(self.count)
+		self.count += 1
 		return True
 
 class Distributor(multiprocessing.Process):
@@ -115,13 +115,10 @@ class Distributor(multiprocessing.Process):
 	def __init__(self, task_id, char, queue):
 		#1 Internal Init
 		multiprocessing.Process.__init__(self)
-		self.config = {}
 		self.task_id = task_id
 		self.p2c_q, self.c2p_q, self.fb_q = queue
 		self.wifi_ip, self.vlc_ip, self.fb_port = char
-		with open('config.json') as cf:
-		 	self.config = json.load(cf)
-			pass
+		self.config = load_json('./config.json')
 		#2 plugin Source Init
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
 		self.src = StreamSource(["static", data]) #udp/file_p/static
@@ -142,12 +139,12 @@ class Distributor(multiprocessing.Process):
 
 	def class_init(self):
 		#5 Socket Queue Init 
-		self.wifi_q = Queue.Queue()
-		self.vlc_q = Queue.Queue()
+		self.wifi_q = deque()
+		self.vlc_q = deque()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
 			(0.0,			1.0),
-			int(self.config['sWindow_rx'])
+			int(self.config['sWindow_tx'])
 		)
 		pass
 
@@ -181,7 +178,7 @@ class Distributor(multiprocessing.Process):
 			self.encoder.clearAll()
 			fname, fhash, fsize = self.src.data.char
 			flength = self.src.length
-			frame = 'src-now %s %d %d %d'%(fname, fhash, fsize, flength) #notify Rx side
+			frame = 'src-now %s %s %d %d'%(fname, fhash, fsize, flength) #notify Rx side
 			return self.response(True, frame)
 		return self.response(False)
 
@@ -223,8 +220,8 @@ class Distributor(multiprocessing.Process):
 		self.__vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 		while True:
-			if not self.vlc_q.empty():
-				data = self.vlc_q.get_nowait()
+			if len(self.vlc_q):
+				data = self.vlc_q.popleft()
 				#print('To VLC link: %s'%(data))
 				self.__vlc_skt.sendto(data, (self.vlc_ip, port))
 				pass
@@ -234,8 +231,8 @@ class Distributor(multiprocessing.Process):
 		self.__wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 		while True:
-			if not self.wifi_q.empty():
-				data = self.wifi_q.get_nowait()
+			if len(self.wifi_q):
+				data = self.wifi_q.popleft()
 				#print('To Wi-Fi link: %s'%(data))
 				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
 				pass

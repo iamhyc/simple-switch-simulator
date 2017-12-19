@@ -2,10 +2,11 @@
 '''
 Source: Data Flow Source
 @author: Mark Hong
+@level: debug
 '''
 import json, socket
 import threading, Queue
-from os.path import getsize
+from os import path
 from sys import maxint
 from time import ctime, sleep
 from urllib2 import urlopen
@@ -13,12 +14,14 @@ from Utility.Utility import printh
 
 def zeroPadding(length, data):
 	raw_len = len(data)
-	if raw_len > 0:
-		pad_len = length - len(data)
-		return data + chr(0) * pad_len
-		pass
-	else:
+	if raw_len==0 or length<=0:
 		return ''
+	elif raw_len==length:
+		return data
+	else:
+		pad_len = length - raw_len
+		return data + chr(0) * pad_len
+	pass
 
 class udp_ops_class:
 	"""docstring for udp_ops_class"""
@@ -52,13 +55,14 @@ class udp_ops_class:
 class file_ops_class:
 	"""docstring for file_ops_class"""
 	def __init__(self, url):
+		url = path.join('Files', url)
 		self.url = url
-		self.size = os.path.getsize(self.url)
+		self.size = path.getsize(self.url)
 
 		self.hashcode = hash(self.url)
 		self.char = ('file', self.hashcode, self.size)
 		
-		self.res = open(url, 'wb')
+		self.res = open(url, 'rb')
 		pass
 
 	def data_gethash_op(self):
@@ -68,11 +72,11 @@ class file_ops_class:
 		return self.size
 	
 	def data_read_op(self, length):
-		data = res.read(length)
+		data = self.res.read(length)
 		return zeroPadding(length, data)
 	
 	def data_close_op(self):
-		res.close()
+		self.res.close()
 		pass
 
 class static_ops_class:
@@ -180,6 +184,7 @@ class StreamSource:
 		self.paused = True
 		if self.sourceHandle.is_alive():
 			self.sourceHandle.join()
+		printh('Source', 'Stream stopped...', 'red')
 		pass
 
 	def empty(self):
@@ -195,6 +200,7 @@ class StreamSource:
 				data = self.data.data_read_op(self.length)
 				if not data:
 					self.paused = True
+					raise Exception('End of File')
 					pass
 				else:
 					self.buffer.put_nowait(data)
@@ -202,6 +208,6 @@ class StreamSource:
 					pass
 				sleep(interval)
 			except Exception as e:
-				pass
+				printh('read-thread', e, 'red')
 			pass
 		pass

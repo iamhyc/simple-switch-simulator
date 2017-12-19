@@ -1,4 +1,9 @@
 #! /usr/bin/python
+'''
+Algorithm: for feedback statistical data manipulation
+@author: Mark Hong
+@level: debug
+'''
 from Utility.Utility import printh
 from multiprocessing import Process, Queue
 import threading

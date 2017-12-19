@@ -23,6 +23,7 @@ def helper():
 	print("                 [RM]    Remove a Client							")
 	print("                 [SW]    Switch a Client Link					")
 	print("                 [SRC]   Change a Client Source					")
+	print("                 [STOP]  Stop a Client Source					")
 	print("                 [NOW]   Start a Client Source					")
 	print("                 [SC]    Execute Script File						")
 	print("                 [CLS]   Clear screen							")
@@ -69,6 +70,12 @@ def main():
 				status, data = request(tmp, skt, 3)
 				print(status)
 				pass
+			elif op=='stop' and len(cmd)>=1:
+				#'<command> <task_id> <type> <data>'
+				tmp = 'src-set %s static %s'%(cmd[0], chr(0))
+				status, data = request(tmp, skt, 3)
+				print(status)
+				pass
 			elif op=='now' and len(cmd)>=1:
 				#'<command> <task_id> <type> <data>'
 				tmp = ('%s %s'%('src-now', cmd[0]))
@@ -82,7 +89,10 @@ def main():
 				print(status)
 				pass
 			elif op=='sc' and len(cmd)>=1:
-				script_file(cmd[1])
+				script_file(cmd[0])
+				pass
+			elif op=='exec' and len(cmd)>=1:
+				exec(cmd[0])
 				pass
 			elif op=='clear' or op=='cls':
 				_cls()
