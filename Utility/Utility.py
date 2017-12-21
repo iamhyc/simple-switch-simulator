@@ -4,8 +4,9 @@ Utility: useful function utilities
 @author: Mark Hong
 @level: release
 '''
-import json, time, threading
+import json, time, struct, threading
 from termcolor import colored, cprint
+#import greenlet
 
 def load_json(uri):
 	try:
@@ -16,7 +17,7 @@ def load_json(uri):
 	pass
 
 def cmd_parse(str):
-	cmd = ''
+	cmd = []
 	op_tuple = str.lower().split(' ')
 	op = op_tuple[0]
 	if len(op_tuple) > 1:
@@ -62,9 +63,9 @@ def exec_watch(process, hook=None, fatal=False, gen=True):
 		pass
 	pass
 
-def printh(tip, cmd, color=None):
+def printh(tip, cmd, color=None, split=' '):
 	print(
-		colored('[%s] '%(tip), 'magenta') 
+		colored('[%s]%s'%(tip, split), 'magenta')
 		+ colored(cmd, color)
 		+ ' '
 		)

@@ -113,51 +113,9 @@ def idle_work_op(cmd, sock, addr):
 	pass
 
 '''
-Process Internal Function
+Process Thread Collection
 '''
-def disp_init():
-	global skt, fb_q, a2p_q, alg_node, ClientCount, proc_map, proc_remap, ops_map, fbHandle
-
-	# Map Init
-	proc_map = {}
-	proc_remap = {}
-	ops_map = {
-		# General Operation
-		"ls":process_print_op,
-		"add":register_client_op,
-		# Specific Operation
-		"src-set":set_source_op,
-		"src-now":start_source_op,
-		"idle":idle_work_op,
-		"exit":dist_exit_op,
-	}
-	# converg Socket Init
-	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	skt.bind(('', config['converg_disp_port']))
-	skt.listen(10)
-	# plugin Alg. Node Init
-	ClientCount = 0
-	fb_q = multiprocessing.Queue()
-	a2p_q = multiprocessing.Queue()
-	alg_node = Algorithm((fb_q, a2p_q))
-	alg_node.daemon = True #set as daemon process
-	exec_watch(alg_node, hook=disp_exit, fatal=True)
-	# alg_node.start()
-	# plugin Alg. Node feedback
-	fbHandle = threading.Thread(target=fbThread, args=(fb_q, ))
-	fbHandle.setDaemon(True)
-	fbHandle.start()
-	pass
-
-def disp_exit():
-	if alg_node.is_alive():
-		alg_node.terminate()
-		alg_node.join()
-		pass
-	os._exit(0)
-	pass
-
-def fbThread(fb_q):
+def algThread(fb_q):
 	while True:
 		if not fb_q.empty():
 			frame = fb_q.get_nowait()
@@ -182,10 +140,54 @@ def tcplink(sock, addr):
 		pass
 	pass
 
-def main():
-	disp_init()
-	# Converg Layer Dispatcher
+'''
+Process Internal Function
+'''
+def disp_init():
+	global skt, fb_q, a2p_q, alg_node, config, ClientCount, proc_map, proc_remap, ops_map, fbHandle
 
+	config = load_json('./config.json')
+	# Map Init
+	proc_map = {}
+	proc_remap = {}
+	ops_map = {
+		# General Operation
+		"ls":process_print_op,
+		"add":register_client_op,
+		# Specific Operation
+		"src-set":set_source_op,
+		"src-now":start_source_op,
+		"idle":idle_work_op,
+		"del":dist_exit_op,
+	}
+	# converg Socket Init
+	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	skt.bind(('', config['converg_disp_port']))
+	skt.listen(10)
+	# plugin Alg. Node Init
+	ClientCount = 0
+	fb_q = multiprocessing.Queue()
+	a2p_q = multiprocessing.Queue()
+	alg_node = Algorithm((fb_q, a2p_q))
+	alg_node.daemon = True #set as daemon process
+	exec_watch(alg_node, hook=disp_exit, fatal=True)
+	# plugin Alg. Node feedback
+	algHandle = threading.Thread(target=algThread, args=(fb_q, ))
+	algHandle.setDaemon(True)
+	algHandle.start()
+
+	printh('Dispatcher', "Dispatcher is now online...", 'green')
+	pass
+
+def disp_exit():
+	if alg_node.is_alive():
+		alg_node.terminate()
+		alg_node.join()
+		pass
+	os._exit(0)
+	pass
+
+def main():
 	while True:
 		sock, addr = skt.accept()
 		t = threading.Thread(target=tcplink, args=(sock, addr[0]))
@@ -194,10 +196,8 @@ def main():
 		pass
 	pass
 
-if __name__ == '__main__':
-	config = load_json('./config.json')
-
-	printh('Dispatcher', "Dispatcher is now online...", 'green')
+if __name__ == '__main__': #Converg Layer Dispatcher
+	disp_init()
 	try:
 		main()
 	except Exception as e:
