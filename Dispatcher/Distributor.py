@@ -111,22 +111,19 @@ class Distributor(multiprocessing.Process):
 			multiprocess control side
 	"""
 
-	def __init__(self, task_id, char, queue):
+	def __init__(self, task_id, fb_q, char, rf_tuple):
 		#1 Internal Init
 		multiprocessing.Process.__init__(self)
 		self.task_id = task_id
-		self.p2c_q, self.c2p_q, self.fb_q = queue
+		self.fb_q = fb_q
 		self.wifi_ip, self.vlc_ip, self.fb_port = char
+		self.req, self.res = rf_tuple
 		self.config = load_json('./config.json')
 		#2 plugin Source Init
 		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
-		self.src = StreamSource(["static", data]) #udp/file_p/static
+		self.src = StreamSource(task_id, ["static", data]) #udp/file_p/static
 
-		#3 Socket Init
-		self.__vlc_skt = None
-		self.__wifi_skt = None
-
-		#4 Operation Map Driver
+		#3 Operation Map Driver
 		self.ops_map = {
 			"src-get":self.getSource,
 			"src-set":self.configSource,
@@ -137,7 +134,7 @@ class Distributor(multiprocessing.Process):
 		pass
 
 	def class_init(self):
-		#5 Socket Queue Init 
+		#4 Socket Queue Init 
 		self.wifi_q = deque()
 		self.vlc_q = deque()
 		self.encoder = QueueCoder(
@@ -150,27 +147,28 @@ class Distributor(multiprocessing.Process):
 	'''
 	Process Helper Function
 	'''
-	def response(self, status, frame=''):
-		if status:
-			data = '+'
-		else:
-			data = '-'
-
-		frame = '%s%s'%(data, frame)
-		self.c2p_q.put_nowait(frame)
-		return True
-
 	def setRatio(self, ratio):
 		ratio = [float(x) for x in ratio]
 		self.encoder.setRatio(ratio)
-		return self.response(True)
+		return self.res(True)
 
 	def setValue(self, tuple):
-		return self.response(True)
+		return self.res(True)
 
 	def triggerSource(self, cmd):
 		self.src.start()
-		return self.response(True)
+		#init feedback link --> non-blocking check
+		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
+		#init transmission link --> idle
+		thread.start_new_thread(self.XmitThread, 
+			('Wi-Fi', (self.wifi_ip, self.config['stream_wifi_port']), self.wifi_q)
+		)
+		thread.start_new_thread(self.XmitThread, 
+			('VLC', (self.vlc_ip, self.config['stream_vlc_port_tx']), self.vlc_q)
+		)
+		#init data source --> busy
+		thread.start_new_thread(self.EncoderThread,())
+		return self.res(True)
 
 	def configSource(self, cmd):
 		if self.src.config(cmd): #True for Restart
@@ -178,12 +176,12 @@ class Distributor(multiprocessing.Process):
 			fname, fhash, fsize = self.src.data.char
 			flength = self.src.length
 			frame = 'src-now %s %s %d %d'%(fname, fhash, fsize, flength) #notify Rx side
-			return self.response(True, frame)
-		return self.response(False)
+			return self.res(True, frame)
+		return self.res(False)
 
 	def getSource(self, cmd):
 		frame = self.src.getSource()
-		return self.response(True, frame)
+		return self.res(True, frame)
 	'''
 	Process Thread Function
 	'''
@@ -206,7 +204,7 @@ class Distributor(multiprocessing.Process):
 				pass
 		pass
 
-	def distXmitThread(self):
+	def EncoderThread(self):
 		while True:
 			if not self.src.empty():
 				raw = self.src.get()
@@ -215,27 +213,16 @@ class Distributor(multiprocessing.Process):
 			pass
 		pass
 
-	def vlcXmitThread(self, port):
-		self.__vlc_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+	def XmitThread(self, name, addr_tuple, xmit_q):
+		xmit_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		while True:
-			if len(self.vlc_q):
-				data = self.vlc_q.popleft()
-				#print('To VLC link: %s'%(data))
-				self.__vlc_skt.sendto(data, (self.vlc_ip, port))
-				pass
-		pass
-
-	def wifiXmitThread(self, port):
-		self.__wifi_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-		while True:
-			if len(self.wifi_q):
-				data = self.wifi_q.popleft()
-				#print('To Wi-Fi link: %s'%(data))
-				self.__wifi_skt.sendto(data, (self.wifi_ip, port))
+			if len(xmit_q):
+				data = xmit_q.popleft()
+				#print('To %s link: %s'%(name, data))
+				xmit_skt.sendto(data, addr_tuple)
 				pass
 			pass
+			sleep(0.1)
 		pass
 
 	'''
@@ -245,18 +232,12 @@ class Distributor(multiprocessing.Process):
 		self.class_init()
 		self.src.class_init()
 		self.encoder.class_init()
-		#init feedback link --> non-blocking check
-		thread.start_new_thread(self.uplinkThread,())# args[, kwargs]
-		#init transmission link --> idle
-		thread.start_new_thread(self.vlcXmitThread, (self.config['stream_vlc_port_tx'], ))
-		thread.start_new_thread(self.wifiXmitThread, (self.config['stream_wifi_port'], ))
-		#init data source --> busy
-		thread.start_new_thread(self.distXmitThread,())
 		pass
 
 	def dist_stop(self):
 		#close socket here
 		#terminate thread here
+		self.src.stop()
 		printh('%s %d'%("Client", self.task_id), "Now exit...", 'red')
 		exit()
 		pass
@@ -265,11 +246,9 @@ class Distributor(multiprocessing.Process):
 		try: # manipulate with process termination signal
 			self.dist_start()
 			while True: # main loop for control
-				if not self.p2c_q.empty(): # data from Parent queue
-					data = self.p2c_q.get_nowait()
-					op, cmd = cmd_parse(data)
-					self.ops_map[op](cmd)
-					pass
+				data = self.req()
+				op, cmd = cmd_parse(data)
+				self.ops_map[op](cmd)
 				pass
 		except Exception as e:
 			printh('Distributor', e, 'red') #for debug

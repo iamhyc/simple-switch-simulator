@@ -46,7 +46,10 @@ class udp_ops_class:
 		return self.size
 
 	def data_read_op(self, length):
-		return self.skt.recv(4096)
+		try:
+			return self.skt.recv(4096)
+		except Exception as e:
+			raise Exception('')
 	
 	def data_close_op(self):
 		self.skt.close()
@@ -109,7 +112,7 @@ class StreamSource:
 		* hash File, hash to access file content
 		* static, static content (tap-generator)
 	"""
-	def __init__(self, src):
+	def __init__(self, task_id, src):
 		# Source Stream Control
 		self.speed = maxint #no limit
 		self.length = 1500 #default value
@@ -127,6 +130,7 @@ class StreamSource:
 			'file':file_ops_class,
 			'static':static_ops_class
 		}
+		self.task_id = task_id
 		self.data = self.src_map[src[0]](src[1])
 		pass
 
@@ -177,14 +181,14 @@ class StreamSource:
 		self.paused = False
 		self.thread_init()
 		self.sourceHandle.start()
-		printh('Source', 'Now start...', 'green')
+		printh('Source %d'%self.task_id, 'Now start...', 'green')
 		pass
 
 	def stop(self):
 		self.paused = True
 		if self.sourceHandle.is_alive():
 			self.sourceHandle.join()
-		printh('Source', 'Stream stopped...', 'red')
+		printh('Source %d'%self.task_id, 'Stream stopped...', 'red')
 		pass
 
 	def empty(self):
@@ -208,6 +212,7 @@ class StreamSource:
 					pass
 				sleep(interval)
 			except Exception as e:
-				printh('read-thread', e, 'red')
+				if not e.message=='':
+					printh('read-thread', e, 'red')
 			pass
 		pass

@@ -57,7 +57,7 @@ def default_op(op, cmd):
 	print(status)
 	return status, data
 
-def ls_op_wrapper(cmd):
+def ls_op_wrapper(cmd=[]):
 	status, data = default_op('ls', cmd)
 	_cls()
 	cprint("%s\n"%(data), 'green')
@@ -82,7 +82,7 @@ def srcnow_op_wrapper(cmd):
 	pass
 
 def del_op_wrapper(cmd):
-	default_op('del', cmd)
+	default_op('exit', cmd)
 	pass
 
 def cls_helper_op(cmd):
@@ -108,12 +108,17 @@ def alias_helper_op(cmd):
 	pass
 
 def internal_helper_op(cmd=[]):
-	_cls()
 	for (k,v) in ex.items.items():
 		tmp = k.split(', ')[0].upper()
 		printh(tmp, v, 'yellow', split=':\t')
 		pass
 	print
+	pass
+
+def execute_helper_op(cmd):
+	cmd = ' '.join(cmd)
+	print(cmd)
+	exec(cmd)
 	pass
 
 def main():
@@ -144,12 +149,12 @@ def _init():
 	ex.register(['clear', 'cls'], cls_helper_op)
 	ex.register(['alias', 'a'], alias_helper_op)
 	ex.register(['help', 'h'], internal_helper_op)
+	ex.register(['exec'], execute_helper_op)
 
 	ex.register(['ls'], ls_op_wrapper, 
 		'List current clients status from Dispatcher.\n\t' + 
 		colored('ls', 'green')
 		)
-
 	ex.register(['add'], add_op_wrapper,
 		'Register a new CLIENT(for test).\n\t' + 
 		colored('add <ip1> <ip2> <rc_flag=1>', 'green')

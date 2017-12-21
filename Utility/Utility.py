@@ -26,15 +26,23 @@ def cmd_parse(str):
 	return op, cmd
 	pass
 
-def response(status, sock, optional=''):
-	if status:
-		frame = '+'
-	else:
-		frame = '-'
+def unpack_helper(fmt, data):
+	    size = struct.calcsize(fmt)
+	    return struct.unpack(fmt, data[:size]), data[size:]
 
-	if optional != '':
-		frame += optional
+def build_frame(status, ftype='', fdata=''):
+	if status:
+		status = '+'
+	else:
+		status = '-'
 	
+	if ftype:
+		return "%s%s %s"%(status, ftype, fdata)
+	else:
+		return "%s%s"%(status, fdata)
+
+def response(status, sock, optional=''):
+	frame = build_frame(status, fdata=optional)
 	sock.send(frame)
 	pass
 
@@ -72,11 +80,27 @@ def printh(tip, cmd, color=None, split=' '):
 	pass
 
 class AlignExecutor:
-	"""docstring for SyncExecutor"""
+	"""docstring for AlignExecutor"""
 	def __init__(self, p2c_q, c2p_q):
 		self.p2c_q = p2c_q
 		self.c2p_q = c2p_q
 		pass
+
+	def ReqFactory(self):
+		def req():
+			while self.p2c_q.empty(): pass
+			data = self.p2c_q.get_nowait()
+			return data
+			pass
+		return req
+
+	def ResFactory(self):
+		def res(status, fdata=''):
+			frame = build_frame(status, fdata=fdata)
+			self.c2p_q.put_nowait(frame)
+			return True
+			pass
+		return res
 
 	def exec_nowait(self, cmd):
 		while not self.c2p_q.empty():

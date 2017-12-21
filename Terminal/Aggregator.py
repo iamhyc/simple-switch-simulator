@@ -12,6 +12,10 @@ from sys import maxint
 from time import ctime, sleep, time
 from Utility.Utility import load_json, cmd_parse, printh, exec_watch
 
+def unpack_helper(fmt, data):
+	    size = struct.calcsize(fmt)
+	    return struct.unpack(fmt, data[:size]), data[size:]
+
 def build_frame(status, ftype='', fdata=''):
 	if status:
 		status = '+'
@@ -22,10 +26,6 @@ def build_frame(status, ftype='', fdata=''):
 		return "%s%s %s"%(status, ftype, fdata)
 	else:
 		return "%s%s"%(status, fdata)
-
-def unpack_helper(fmt, data):
-	    size = struct.calcsize(fmt)
-	    return struct.unpack(fmt, data[:size]), data[size:]
 
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator

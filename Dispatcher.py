@@ -39,7 +39,6 @@ def dist_exit_op(cmd, sock, addr):
 
 	proc_map[task_id]['thread'].terminate() #forcely exit the server
 	del proc_map[task_id] # delete the item
-
 	response(True, sock)
 	printh('Dispatcher', 'Client %d exit.'%(task_id), 'red')
 	pass
@@ -58,12 +57,14 @@ def register_client_op(cmd, sock, addr):
 	proc_map[task_id] = {}
 	proc_map[task_id]['char'] = (wifi_ip, vlc_ip, port)
 	proc_map[task_id]['res_sock'] = sock
-	proc_map[task_id]['se'] = AlignExecutor(p2c_q, c2p_q)
 	proc_map[task_id]['queue'] = (p2c_q, c2p_q, fb_q)
+
+	se = AlignExecutor(p2c_q, c2p_q)
+	proc_map[task_id]['se'] = se
 	proc_map[task_id]['thread'] = Distributor(
-									task_id,
+									task_id, fb_q,
 									proc_map[task_id]['char'], 
-									proc_map[task_id]['queue']
+									(se.ReqFactory(), se.ResFactory())
 								)
 	proc_map[task_id]['thread'].daemon = True #set as daemon process
 	proc_map[task_id]['thread'].start()
@@ -158,7 +159,7 @@ def disp_init():
 		"src-set":set_source_op,
 		"src-now":start_source_op,
 		"idle":idle_work_op,
-		"del":dist_exit_op,
+		"exit":dist_exit_op,
 	}
 	# converg Socket Init
 	skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -197,11 +198,11 @@ def main():
 	pass
 
 if __name__ == '__main__': #Converg Layer Dispatcher
-	disp_init()
 	try:
+		disp_init()
 		main()
 	except Exception as e:
-		#raise e #for debug
+		printh('Dispatcher', e, 'red') #for debug
 		pass
 	finally:
 		disp_exit()
