@@ -165,42 +165,9 @@ class Aggregator(multiprocessing.Process):
 
 	def redistFileThread(self, redist_q):
 		redist_fp = open(path.join('Files', self.fhash), 'w+b')
-		#redist_fp.fillin(chr(0), self.size) #not needed
 
-		seq_map = [{'flag':False} for x in xrange(self.numB)]
-		ptr, tot = 0, self.numB
+		#remain for file receiving service#
 
-		while not self.proc_paused and redist_q.empty():
-			time.sleep(0.1) # wait
-			pass
-
-		while not self.redist_paused and tot>0:
-			while not redist_q.empty():
-				raw = redist_q.get_nowait()
-				#print('Redistributed Data: %s'%(raw)) #for debug
-				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
-				seq_map[Seq][str(Offset)] = len(Data)
-				redist_fp.seek(Seq*Size + Offset)
-				redist_fp.write(Data)
-
-				if sum(seq_map[Seq].values())==Size:
-					seq_map[Seq]['flag'] = True
-					tot -=1
-					pass
-				pass
-
-			while ptr<self.numB and seq_map[ptr]['flag']:
-				print(ptr)
-				ptr = ptr + 1 #% (self.numB)
-				pass
-
-			if ptr<self.numB:
-				print('Loss: %d'%(ptr))
-				self.feedback(False, fdata=ptr) #retransmission
-				time.sleep(0.001) #wait for transmission
-				pass
-			pass
-		
 		redist_fp.truncate(self.size) #remove extra zeros
 		redist_fp.close()
 		printh('Aggregator', 'End of File', 'red')
@@ -218,25 +185,17 @@ class Aggregator(multiprocessing.Process):
 				raw, addr = recv_skt.recvfrom(4096)
 
 				if self.src_type=='r':
-					(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
-					data_len = len(Data)
-					#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
-					ptr = Seq % self.config['sWindow_rx']
-					if self.ringBuffer[ptr][0] != Seq:
-						self.ringBuffer[ptr] = [Seq, Size - data_len, [chr(0)]*Size]
-						self.ringBuffer[ptr][2][Offset:Offset+data_len] = Data
-						pass
-					else:
-						self.ringBuffer[ptr][2][Offset:Offset+data_len] = Data
-						self.ringBuffer[ptr][1] -= data_len
-						pass
+					(Seq, Option, CRC), Data = unpack_helper(self.config['struct'], raw)
+
+					#remain for stream receiving service#
+					
 					pass
 				else: #src_type=='c'
 					self.redist_q.put_nowait(raw)
 					pass
 
-				rate_inst = data_len / (time.time() - last_time)
-				self.feedback(True, name, '%d'%(rate_inst))
+				#remain for transmission feedback#
+
 				pass
 			except Exception as e:
 				pass
@@ -244,43 +203,9 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def processThread(self, redist_q): #for relay only
-		while self.ringBuffer[0][0] != self.numA and not self.proc_paused:
-			time.sleep(0.1) # wait
-			pass
+		
+		#remain for stream receiving service#
 
-		cnt, ptr = 0, 0
-		timeout = time.time() # packet time counter
-		while cnt <= self.numB and not self.proc_paused:
-			ptr = (cnt % self.config['sWindow_rx'])
-			if time.time()-timeout < self.config['Atimeout']:
-				if self.ringBuffer[ptr][0] == cnt: #assume: writing not over reading
-					timeout = time.time() # subpacket time counter
-
-					sub_verified = False
-					while time.time()-timeout < self.config['Btimeout']:
-						if self.ringBuffer[ptr][1] == 0:
-							redist_q.put_nowait(''.join(self.ringBuffer[ptr][2]))
-							sub_verified = True
-							break
-						pass
-
-					timeout = time.time() # reset subpacket time counter
-					cnt += 1
-					ptr = (cnt % self.config['sWindow_rx'])
-					if sub_verified:
-						print(cnt)
-					else:
-						print("subPacket loss in %d."%(cnt))
-					pass
-				pass
-			else: # packet loss
-				timeout = time.time() # reset packet time counter
-				cnt += 1
-				ptr = (cnt % self.config['sWindow_rx'])
-				print("Packet %d loss."%(cnt))
-				pass
-			pass
-		#after the aggregation process
 		pass
 
 	def agg_exit(self):

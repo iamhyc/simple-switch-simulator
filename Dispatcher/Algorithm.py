@@ -34,18 +34,9 @@ class Algorithm(Process):
 	def countup(self, frame):
 		task_id, link_name, data = frame_parse(frame)
 		data = float(data)
-		if self.term_map[task_id]:
-			index = self.const_map[link_name]
-			self.term_map[task_id]['rate'][index] = (
-				self.term_map[task_id]['rate'][index] * (1-self.tensity)
-				 + data * self.tensity
-			)
-			pass
-		else:#init statistics
-			self.term_map[task_id] = {
-				'rate':[0, 0]
-			}
-			pass
+
+		#remain for feedback algorithm#
+
 		pass
 
 	'''
@@ -53,14 +44,9 @@ class Algorithm(Process):
 	'''
 	def applyThread(self, interval):
 		wifi, vlc = self.const_map['wifi'], self.const_map['vlc']
-		while True:
-			for (k,v) in self.term_map.items():
-				#apply operations, self.a2p_q
-				r = v['rate'][wifi] / v['raste'][vlc]
-				frame = "%s %s %.2f %.2f"('ratio', k, r/(1+r), 1/(1+r))
-				pass
-			sleep(interval) #apply periodically
-			pass
+		
+		#remain for feedback algorithm applying#
+
 		pass
 
 	'''
@@ -88,7 +74,7 @@ class Algorithm(Process):
 			while True:
 				if not self.fb_q.empty():
 					frame = fb_q.get_nowait()
-					self.countup(frame)
+					#self.countup(frame)
 					pass
 				pass
 		except Exception as e:

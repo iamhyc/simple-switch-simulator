@@ -21,7 +21,9 @@ def randomString(len, dtype='hex'):
 
 def crcFactory(dtype='crc-16'):
 	if dtype=='crc-32':
-		return mkCrcFun(0x104c11db7, initCrc=0, xorOut=0xFFFFFFFF)
+		return mkCrcFun(0x104C11DB7, initCrc=0x00000000, xorOut=0xFFFFFFFF)
+	elif dtype=='crc-8':
+		return mkCrcFun(0x107, rev=False, initCrc=0x00, xorOut=0x00)
 	else:
-		return mkCrcFun(0x11021, rev=False, initCrc=0x0000, xorOut=0x0000)
+		return mkCrcFun(0x18005, initCrc=0x0000, xorOut=0x0000)
 	pass

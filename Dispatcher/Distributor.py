@@ -28,11 +28,11 @@ class QueueCoder:
 
 	def class_init(self):
 		self.crcGen = crcFactory('crc-16')
-		#Seq[4B] + Size[2B] + Offset[2B] + CRC16[2B] + Data
-		#Or: Tail_Flag[1b]|Seq[4B] + Order[1B] + CRC8[2B] + Data
-		self.frame = struct.Struct('IHHH') #Or, Struct('IBs')
+		#Cache-and-Go: Seq[4B] + Option[1B] + CRC8[1B]
+		#Split-and-Go: T[1b]|Seq[4B] + Order[1B] + CRC8[1B]
+		self.frame = struct.Struct('IBB')
 		self.buffer = ctypes.create_string_buffer(self.frame.size)
-		self.crcFrame = struct.Struct('IHH')
+		self.crcFrame = struct.Struct('IB')
 		self.crcBuffer = ctypes.create_string_buffer(self.crcFrame.size)
 		pass
 
@@ -51,54 +51,16 @@ class QueueCoder:
 
 	def reput(self, seq):
 		printh('Encoder', 'reput %d'%(seq))
-		seq = seq % self.win_size
-		for x in xrange(self.number):
-			tmp = seq % self.win_size
-			tmp_str = self.tx_window[tmp][x]
-			if len(tmp_str) > 1:
-				self.tuple_q[x].appendleft(tmp_str)
-				pass
-			pass
+
+		#remain for retransmission control#
+		
 		pass
 
 	def put(self, raw):
 		raw_len = len(raw)
-		data_len = [int(round(x*raw_len)) for x in self.splitter[:self.number-1]]
-		data_len.append(raw_len - sum(data_len)) #complementary last part
 
-		#init a empty list(NOT SAME REFERENCE!)
-		data = [''] * self.number 
-		data_ptr = 0
-		#firstly chop and add Transport Header
-		for x in xrange(self.number):
-			if data_len[x]:
-				self.crcFrame.pack_into(self.crcBuffer, 0,
-										self.count,#Sequence number
-										raw_len,#total data size
-										data_ptr,#offset in subpacket
-										)
-				crcValue = self.crcGen(self.crcBuffer)
-				self.frame.pack_into(self.buffer, 0, 
-									self.count, raw_len, data_ptr, crcValue)
-
-				header = ctypes.string_at(
-					ctypes.addressof(self.buffer),
-					self.frame.size)
-				data[x] = header + raw[data_ptr:data_ptr+data_len[x]]
-				data_ptr += data_len[x]
-				pass
-			pass
-		#then, straightly push into each split queue
-		for x in xrange(self.number):
-			tmp = self.count % self.win_size
-			self.tx_window[tmp][x] = data[x]
-			if len(data[x]):
-				self.tuple_q[x].append(data[x])
-				pass
-			pass
-
-		print(self.count)
-		self.count += 1
+		#remain for transmission control#
+		
 		return True
 
 class Distributor(multiprocessing.Process):
