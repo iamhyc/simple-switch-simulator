@@ -11,57 +11,9 @@ from collections import deque
 from time import sleep, ctime
 
 from StreamSource import StreamSource
+from QueueCoder import QueueCoder
 from Utility.Utility import cmd_parse, printh, load_json
-from Utility.Math import *
-
-class QueueCoder:
-	"""docstring for QueueCoder"""
-	def __init__(self, tuple_q, ratio_list, sWindow):
-		self.tuple_q = tuple(tuple_q)
-		self.splitter = list(ratio_list)
-		self.number = len(tuple_q)
-		self.win_size = sWindow
-		self.count = 0
-		#(ring)Buffer Array as tx sliding window
-		self.tx_window = [[chr(0)] * self.number for x in xrange(sWindow)]
-		pass
-
-	def class_init(self):
-		self.crcGen = crcFactory('crc-16')
-		#Cache-and-Go: Seq[4B] + Option[1B] + CRC8[1B]
-		#Split-and-Go: T[1b]|Seq[4B] + Order[1B] + CRC8[1B]
-		self.frame = struct.Struct('IBB')
-		self.buffer = ctypes.create_string_buffer(self.frame.size)
-		self.crcFrame = struct.Struct('IB')
-		self.crcBuffer = ctypes.create_string_buffer(self.crcFrame.size)
-		pass
-
-	def setRatio(self, ratio):
-		#Ratio, Start, Stop, Switch
-		#need a <Counter Class> first
-		self.splitter = [float(x) for x in ratio]
-		pass
-
-	def clearAll(self):
-		for x in xrange(self.number):
-			self.tuple_q[x].clear()
-		#del self.tx_window #dec reference counter
-		self.count = 0 #reset packet sequence
-		pass
-
-	def reput(self, seq):
-		printh('Encoder', 'reput %d'%(seq))
-
-		#remain for retransmission control#
-		
-		pass
-
-	def put(self, raw):
-		raw_len = len(raw)
-
-		#remain for transmission control#
-		
-		return True
+from Utility.Math import randomString
 
 class Distributor(multiprocessing.Process):
 	"""Non-Blocking running Distributor Process
@@ -72,7 +24,6 @@ class Distributor(multiprocessing.Process):
 		@var queue:
 			multiprocess control side
 	"""
-
 	def __init__(self, task_id, fb_q, char, rf_tuple):
 		#1 Internal Init
 		multiprocessing.Process.__init__(self)
@@ -81,10 +32,15 @@ class Distributor(multiprocessing.Process):
 		self.wifi_ip, self.vlc_ip, self.fb_port = char
 		self.req, self.res = rf_tuple
 		self.config = load_json('./config.json')
+		#2 sliding window init
+		tmp = int(self.config['sWindow_tx'])/2
+		self.sWindow = {
+			'Wi-Fi': tmp,
+			'VLC':tmp
+		}
 		#2 plugin Source Init
-		data = ''.join(random.choice(string.hexdigits.upper()) for x in xrange(64))
+		data = randomString(64)
 		self.src = StreamSource(task_id, ["static", data]) #udp/file_p/static
-
 		#3 Operation Map Driver
 		self.ops_map = {
 			"src-get":self.getSource,
@@ -101,7 +57,6 @@ class Distributor(multiprocessing.Process):
 		self.vlc_q = deque()
 		self.encoder = QueueCoder(
 			(self.wifi_q,	self.vlc_q),
-			(0.0,			1.0),
 			int(self.config['sWindow_tx'])
 		)
 		pass
@@ -151,23 +106,14 @@ class Distributor(multiprocessing.Process):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		fb_skt.bind(('', self.fb_port))
 
-		while True:
-			try:
-				data = fb_skt.recv(1024)
-				status, data = data[0], data[1:]
-				if status=='+': #statistical data
-					frame = '%s %s'%(task_id, data[1:])
-					self.fb_q.put_nowait(frame)
-					pass
-				elif status=='-': #retransmission rquest
-					self.encoder.reput(int(data))
-					pass
-			except Exception as e:
-				pass
+		#remain feedback rejust here#
+		#adjust and coerce window upper bound
+		#deal with ACK
+
 		pass
 
 	def EncoderThread(self):
-		while True:
+		while True: #no window limit on source
 			if not self.src.empty():
 				raw = self.src.get()
 				self.encoder.put(raw)
@@ -175,13 +121,21 @@ class Distributor(multiprocessing.Process):
 			pass
 		pass
 
-	def XmitThread(self, name, addr_tuple, xmit_q):
+	def XmitThread(self, name, addr_tuple, xmit_q, sWindow):
 		xmit_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		seq, ptr, sWindow = 0, 0, sWindow
 		while True:
+			#add tx sliding window here#
 			if len(xmit_q):
-				data = xmit_q.popleft()
-				#print('To %s link: %s'%(name, data))
-				xmit_skt.sendto(data, addr_tuple)
+				seq += len(xmit_q)
+				while ptr<seq:
+					##ptr need adjust in feedback part
+					# if (seq-ptr)<self.sWindow[name]:
+					# 	ptr += 1
+					# 	data = xmit_q.popleft()
+					# 	xmit_skt.sendto(data, addr_tuple)
+					# 	pass
+					pass
 				pass
 			pass
 		pass
