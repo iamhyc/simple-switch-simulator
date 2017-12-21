@@ -1,6 +1,7 @@
 #! /usr/bin/python
 from Utility.Utility import *
 from getpass import getuser
+from optparse import OptionParser
 import platform as pt
 import os, time, json, socket
 
@@ -121,9 +122,24 @@ def execute_helper_op(cmd):
 	exec(cmd)
 	pass
 
+def script_helper_op(cmd):
+	cmd = os.path.join('Scripts', cmd[0])
+	scripts = open(cmd, 'r').readlines()
+	for line in scripts:
+		op, cmd = cmd_parse(line)
+		if not ex.apply(op, cmd):
+			break
+		pass
+	pass
+
 def main():
 	_cls()
 	helper()
+
+	if options.sc_file!='':
+		ex.apply('script', [options.sc_file])
+		pass
+	
 	while True:
 		tipstr = colored('%s @ Simulator:[%s]\n$ '%(localuser, time.ctime()), 'cyan')
 		op, cmd = cmd_parse(raw_input(tipstr))
@@ -134,22 +150,38 @@ def main():
 		pass
 	pass
 
+def _print(cmd=[]):
+	pass
+
 def _fini(cmd=[]):
 	print
 	quit()
 	pass
 
 def _init():
-	global config, localuser, ex
+	global config, localuser, options, ex
+
+	parser = OptionParser()
+	parser.add_option("-s", "--server",
+		dest="server", 
+		default="127.0.0.1", 
+		help="Designate the dispatcher server")
+	parser.add_option("-c", "--script",
+		dest="sc_file", 
+		default="", 
+		help="Designate the script file")
+	(options, args) = parser.parse_args()
 
 	config = load_json('./config.json')
 	localuser = getuser()
 	ex = Console()
+	ex.register([''], _print)
 	ex.register(['exit'], _fini)
 	ex.register(['clear', 'cls'], cls_helper_op)
 	ex.register(['alias', 'a'], alias_helper_op)
 	ex.register(['help', 'h'], internal_helper_op)
 	ex.register(['exec'], execute_helper_op)
+	ex.register(['sc', 'script'], script_helper_op)
 
 	ex.register(['ls'], ls_op_wrapper, 
 		'List current clients status from Dispatcher.\n\t' + 
@@ -182,7 +214,7 @@ if __name__ == '__main__':
 
 	try:
 		skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		skt.connect(('localhost', config['converg_disp_port']))
+		skt.connect((options.server, config['converg_disp_port']))
 		main()
 	except Exception as e:
 		cprint('bye', 'red')

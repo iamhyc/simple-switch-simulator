@@ -17,8 +17,8 @@ def load_json(uri):
 	pass
 
 def cmd_parse(str):
-	cmd = []
-	op_tuple = str.lower().split(' ')
+	op, cmd = '', []
+	op_tuple = str.lower().strip().split(' ')
 	op = op_tuple[0]
 	if len(op_tuple) > 1:
 		cmd = op_tuple[1:]

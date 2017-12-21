@@ -222,7 +222,6 @@ class Distributor(multiprocessing.Process):
 				xmit_skt.sendto(data, addr_tuple)
 				pass
 			pass
-			sleep(0.1)
 		pass
 
 	'''

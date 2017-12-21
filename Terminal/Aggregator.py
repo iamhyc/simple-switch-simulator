@@ -4,40 +4,23 @@ Aggregator: for data flow manipulation
 @author: Mark Hong
 @level: debug
 '''
-import socket, Queue
-import json, binascii, struct, math
+import math, socket, Queue
 import threading, multiprocessing
 from os import path
 from sys import maxint
-from time import ctime, sleep, time
-from Utility.Utility import load_json, cmd_parse, printh, exec_watch
-
-def unpack_helper(fmt, data):
-	    size = struct.calcsize(fmt)
-	    return struct.unpack(fmt, data[:size]), data[size:]
-
-def build_frame(status, ftype='', fdata=''):
-	if status:
-		status = '+'
-	else:
-		status = '-'
-	
-	if ftype:
-		return "%s%s %s"%(status, ftype, fdata)
-	else:
-		return "%s%s"%(status, fdata)
+from Utility.Utility import *
 
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
 
 	"""
-	def __init__(self, queue, fb_tuple):
+	def __init__(self, rf_tuple, fb_tuple):
 		super(Aggregator, self).__init__()
 		self.numA = 0#beginSequence
 		self.numB = -1#endSequence
 		self.redist_paused = True
 		self.proc_paused = True
-		self.p2c_q, self.c2p_q = queue
+		self.req, self.res = rf_tuple
 		self.fb_tuple = fb_tuple
 		self.src_type = 'r' #default for stream
 		self.ops_map = {
@@ -83,11 +66,6 @@ class Aggregator(multiprocessing.Process):
 	'''
 	Process Helper Function
 	'''
-	def response(self, status, ftype='', fdata=''):
-		frame = build_frame(status, ftype, fdata)
-		self.c2p_q.put_nowait(frame)
-		return True
-
 	def feedback(self, status, ftype='', fdata=''):
 		frame = build_frame(status, ftype, fdata)
 		self.fb_q.put_nowait(frame)
@@ -116,12 +94,12 @@ class Aggregator(multiprocessing.Process):
 		self.thread_init()
 		self.redist_start()
 		self.proc_start()
-		self.response(True)
+		self.res(True)
 		pass
 
 	def setType(self, src_type):
 		self.src_type = src_type
-		response(True)
+		self.res(True)
 		pass
 
 	def redist_stop(self):
@@ -193,7 +171,7 @@ class Aggregator(multiprocessing.Process):
 		ptr, tot = 0, self.numB
 
 		while not self.proc_paused and redist_q.empty():
-			sleep(0.1) # wait
+			time.sleep(0.1) # wait
 			pass
 
 		while not self.redist_paused and tot>0:
@@ -219,7 +197,7 @@ class Aggregator(multiprocessing.Process):
 			if ptr<self.numB:
 				print('Loss: %d'%(ptr))
 				self.feedback(False, fdata=ptr) #retransmission
-				sleep(0.001) #wait for transmission
+				time.sleep(0.001) #wait for transmission
 				pass
 			pass
 		
@@ -236,7 +214,7 @@ class Aggregator(multiprocessing.Process):
 
 		while not self.proc_paused:
 			try:
-				last_time = time()
+				last_time = time.time()
 				raw, addr = recv_skt.recvfrom(4096)
 
 				if self.src_type=='r':
@@ -257,7 +235,7 @@ class Aggregator(multiprocessing.Process):
 					self.redist_q.put_nowait(raw)
 					pass
 
-				rate_inst = data_len / time() - last_time
+				rate_inst = data_len / (time.time() - last_time)
 				self.feedback(True, name, '%d'%(rate_inst))
 				pass
 			except Exception as e:
@@ -267,26 +245,26 @@ class Aggregator(multiprocessing.Process):
 
 	def processThread(self, redist_q): #for relay only
 		while self.ringBuffer[0][0] != self.numA and not self.proc_paused:
-			sleep(0.1) # wait
+			time.sleep(0.1) # wait
 			pass
 
 		cnt, ptr = 0, 0
-		timeout = time() # packet time counter
+		timeout = time.time() # packet time counter
 		while cnt <= self.numB and not self.proc_paused:
 			ptr = (cnt % self.config['sWindow_rx'])
-			if time()-timeout < self.config['Atimeout']:
+			if time.time()-timeout < self.config['Atimeout']:
 				if self.ringBuffer[ptr][0] == cnt: #assume: writing not over reading
-					timeout = time() # subpacket time counter
+					timeout = time.time() # subpacket time counter
 
 					sub_verified = False
-					while time()-timeout < self.config['Btimeout']:
+					while time.time()-timeout < self.config['Btimeout']:
 						if self.ringBuffer[ptr][1] == 0:
 							redist_q.put_nowait(''.join(self.ringBuffer[ptr][2]))
 							sub_verified = True
 							break
 						pass
 
-					timeout = time() # reset subpacket time counter
+					timeout = time.time() # reset subpacket time counter
 					cnt += 1
 					ptr = (cnt % self.config['sWindow_rx'])
 					if sub_verified:
@@ -296,7 +274,7 @@ class Aggregator(multiprocessing.Process):
 					pass
 				pass
 			else: # packet loss
-				timeout = time() # reset packet time counter
+				timeout = time.time() # reset packet time counter
 				cnt += 1
 				ptr = (cnt % self.config['sWindow_rx'])
 				print("Packet %d loss."%(cnt))
@@ -317,11 +295,9 @@ class Aggregator(multiprocessing.Process):
 			self.class_init()
 
 			while True:
-				if not self.p2c_q.empty():
-					data = self.p2c_q.get_nowait()
-					op, cmd = data[0], data[1:]
-					self.ops_map[op](cmd)
-					pass
+				data = self.req()
+				op, cmd = data[0], data[1:]
+				self.ops_map[op](cmd)
 				pass
 		except Exception as e:
 			printh('Aggregator', e, 'red') #for debug

@@ -4,13 +4,10 @@ Terminal: for command manipulation
 @author: Mark Hong
 @level: debug
 '''
-
-from Terminal.Aggregator import Aggregator
 from Utility.Utility import *
+from Terminal.Aggregator import Aggregator
 
-import os
-import socket, string, binascii
-import threading, multiprocessing
+import os, socket, threading, multiprocessing
 from optparse import OptionParser
 
 global config, options
@@ -109,7 +106,8 @@ def term_init():
 	p2c_q = multiprocessing.Queue() #Parent to Child Queue
 	c2p_q = multiprocessing.Queue() #Child to Parent Queue
 	se = AlignExecutor(p2c_q, c2p_q)
-	processor = Aggregator((p2c_q, c2p_q), (options.server, fb_port))
+	req, res = se.ReqFactory(), se.ResFactory()
+	processor = Aggregator((req, res), (options.server, fb_port))
 	processor.daemon = True
 
 	# Run NOW

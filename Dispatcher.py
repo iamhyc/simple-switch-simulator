@@ -63,7 +63,8 @@ def register_client_op(cmd, sock, addr):
 	proc_map[task_id]['se'] = se
 	proc_map[task_id]['thread'] = Distributor(
 									task_id, fb_q,
-									proc_map[task_id]['char'], 
+									proc_map[task_id]['char'],
+									#proc_map[task_id]['queue'],
 									(se.ReqFactory(), se.ResFactory())
 								)
 	proc_map[task_id]['thread'].daemon = True #set as daemon process
