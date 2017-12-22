@@ -13,7 +13,8 @@
 	"stream_vlc_port_tx":11113,
 	"stream_vlc_port_rx":11113,
 
-	"struct":"IBB",
+	"data_h":"IBB",
+	"control_t":"IBi",
 	"sWindow_tx":7000,
 	"sWindow_rx":1000,
 	"Atimeout":0.30,

@@ -32,7 +32,7 @@ class QueueCoder:
 	def setRatio(self, ratio):
 		if sign(ratio)!=sign(self.ratio):
 			self.count = 0 #adapt to mutation
-		self.ratio = int(ratio)
+		self.ratio = ratio
 		pass
 
 	def clearAll(self, numA=0):
@@ -45,7 +45,7 @@ class QueueCoder:
 		#options: 4b for self.ratio, 4b for self.count
 		return (0xFF & 
 				(abs(self.ratio)&0x0F)<<4 & 
-				abs(self.count)&0x0F
+				(abs(self.count)&0x0F)
 				)
 
 	def build_struct(self, options, raw):

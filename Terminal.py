@@ -22,13 +22,14 @@ def status_print_op(cmd, sock):
 	pass
 
 def start_recv_op(cmd, sock):
+	global src_type
 	ftype, fhash, fsize, flength = cmd
 	#setup default redistribution type
 	if ftype=='udp' or ftype=='static':
 		src_type = 'r'
 	else:
 		src_type = 'c'
-	cmd = ['set', src_type, fhash, fsize, flength]
+	cmd = 'set %s %s %s %s'%(src_type, fhash, fsize, flength)
 	res = se.exec_wait(cmd)
 
 	response(True, sock)

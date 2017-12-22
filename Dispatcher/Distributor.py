@@ -27,17 +27,16 @@ class Distributor(multiprocessing.Process):
 	def __init__(self, task_id, fb_q, char, rf_tuple):
 		#1 Internal Init
 		multiprocessing.Process.__init__(self)
-		self.task_id = task_id
-		self.fb_q = fb_q
-		self.wifi_ip, self.vlc_ip, self.fb_port = char
-		self.req, self.res = rf_tuple
 		self.config = load_json('./config.json')
+		self.task_id 							= task_id
+		self.fb_q 								= fb_q
+		self.wifi_ip, self.vlc_ip, self.fb_port = char
+		self.req, self.res 						= rf_tuple
 		#2 sliding window init
 		tmp = int(self.config['sWindow_tx'])/2
-		self.sWindow = {
-			'Wi-Fi': tmp,
-			'VLC':tmp
-		}
+		self.link_map	=	{0: 'Wi-Fi',	1:'VLC'}
+		self.sWindow	=	{'Wi-Fi': tmp,	'VLC': tmp}
+		self.ptr		=	{'Wi-Fi': 0,	'VLC': 0}
 		#2 plugin Source Init
 		data = randomString(64)
 		self.src = StreamSource(task_id, ["static", data]) #udp/file_p/static
@@ -46,7 +45,6 @@ class Distributor(multiprocessing.Process):
 			"src-get":self.getSource,
 			"src-set":self.configSource,
 			"src-now":self.triggerSource,
-			"set":self.setValue,
 			"ratio":self.setRatio,
 		}
 		pass
@@ -65,11 +63,7 @@ class Distributor(multiprocessing.Process):
 	Process Helper Function
 	'''
 	def setRatio(self, ratio):
-		ratio = [float(x) for x in ratio]
-		self.encoder.setRatio(ratio)
-		return self.res(True)
-
-	def setValue(self, tuple):
+		self.encoder.setRatio(int(ratio))
 		return self.res(True)
 
 	def triggerSource(self, cmd):
@@ -99,19 +93,10 @@ class Distributor(multiprocessing.Process):
 	def getSource(self, cmd):
 		frame = self.src.getSource()
 		return self.res(True, frame)
+
 	'''
 	Process Thread Function
 	'''
-	def uplinkThread(self):
-		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		fb_skt.bind(('', self.fb_port))
-
-		#remain feedback rejust here#
-		#adjust and coerce window upper bound
-		#deal with ACK
-
-		pass
-
 	def EncoderThread(self):
 		while True: #no window limit on source
 			if not self.src.empty():
@@ -123,15 +108,44 @@ class Distributor(multiprocessing.Process):
 
 	def XmitThread(self, name, addr_tuple, xmit_q, sWindow):
 		xmit_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		seq, ptr, sWindow = 0, 0, sWindow
+		seq, sWindow = 0, sWindow
 		while True:
-			#add tx sliding window here#
-			if len(xmit_q) and (seq-ptr)<self.sWindow[name] :
+			if len(xmit_q) and (seq-self.ptr[name])<self.sWindow[name] :
 				seq += 1
-				ptr += 1 #ptr need adjust in feedback part
 				data = xmit_q.popleft()
 				xmit_skt.sendto(data, addr_tuple)
 				pass
+			pass
+		pass
+
+	def uplinkThread(self):
+		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		fb_skt.bind(('', self.fb_port))
+
+		while True:
+			try:
+				data = fb_skt.recv(1024)
+				seq, fid, ftype, fdata = parse_control(data)
+				if ftype=='RATE' or ftype=='CSI':
+					frame = '%s %d %s %s'%(self.task_id, fid, ftype, fdata)
+					self.fb_q.put_nowait(frame)
+					pass
+				elif ftype=='ACK':
+					name = self.link_map(fid)
+					self.ptr[name] = fdata
+					pass
+				elif ftype=='NAK':
+					self.encoder.reput(fdata)
+					#sWindow shrink on tuple_q[fid]
+					pass
+				elif ftype=='BIAS': #rx smart sense
+					name = self.link_map(fid)
+					self.encoder.ratio += fdata
+					pass
+				else:
+					raise Exception('control frame exception')
+			except Exception as e:
+				printh('uplink', e, 'red')
 			pass
 		pass
 
@@ -145,8 +159,6 @@ class Distributor(multiprocessing.Process):
 		pass
 
 	def dist_stop(self):
-		#close socket here
-		#terminate thread here
 		self.src.stop()
 		printh('%s %d'%("Client", self.task_id), "Now exit...", 'red')
 		exit()
