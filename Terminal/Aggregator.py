@@ -13,6 +13,13 @@ from collections import deque
 from SourceService import RelayService, CacheService
 from Utility.Utility import *
 
+class CountWindow(object):
+	"""docstring for CountWindow"""
+	def __init__(self):
+		#countWindow = [Seq, Ratio, Count, Data]
+		self.countWindow = deque()
+		pass
+
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
 	Receiver Phase I: Count Window, Sliding Window, Selected link Sense
@@ -21,7 +28,7 @@ class Aggregator(multiprocessing.Process):
 		super(Aggregator, self).__init__()
 		self.numA = 0#beginSequence
 		self.numB = -1#endSequence
-		self.proc_paused = True
+		self.paused = True
 		self.req, self.res = rf_tuple
 		self.fb_tuple = fb_tuple
 		self.src_type = 'r' #default for stream
@@ -30,8 +37,6 @@ class Aggregator(multiprocessing.Process):
 			'type':self.setType
 		}
 		self.config = load_json('./config.json')
-		#ringBuffer = [Seq, Ratio, Count, Data]
-		self.ringBuffer = [0] * self.config['sWindow_rx']
 		pass
 
 	def thread_init(self):
@@ -46,6 +51,7 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def class_init(self):
+		self.count = CountWindow()
 		# feedback init
 		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
 		self.fb_q = Queue.Queue()
@@ -80,7 +86,7 @@ class Aggregator(multiprocessing.Process):
 	Process Thread Function
 	'''
 	def uplinkThread(self, fb_q):
-		while not self.proc_paused:
+		while not self.paused:
 			if not fb_q.empty():
 				frame = fb_q.get_nowait()
 				self.fb_skt.sendto(frame, self.fb_tuple)
@@ -88,14 +94,32 @@ class Aggregator(multiprocessing.Process):
 			pass
 		pass
 
-	def RecvThread(self, name, port):
-		#recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		#recv_skt.bind(('', port))
-		#recv_skt.setblocking(False)
-		#raw, addr = recv_skt.recvfrom(4096)
+	def RecvThread(self, name, port): #phase I - Sliding Window
+		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		recv_skt.bind(('', port))
+		recv_skt.setblocking(False)
+		raw, addr = recv_skt.recvfrom(4096)
+		printh(name.upper(), 'Now on ', 'green')
 
-		#remain for phase I - Sliding Window refactor here#
+		while not self.paused:
+			try:
+				last_time = time.time()
+				raw, addr = recv_skt.recvfrom(4096)
 
+				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
+				data_len = len(Data)
+				#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
+
+
+				rate_inst = data_len / (time.time() - last_time)
+				build_control()
+				self.feedback(True, name, '%d'%(rate_inst))
+				pass
+			except Exception as e:
+				pass
+			pass
+			pass
+		#after recv stop here
 		pass
 
 

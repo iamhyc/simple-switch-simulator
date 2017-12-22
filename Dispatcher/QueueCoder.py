@@ -21,7 +21,7 @@ class QueueCoder:
 
 	def class_init(self):
 		self.crcGen = crcFactory('crc-8')
-		#Cache-and-Go: Seq[4B] + Option[1B] + CRC8[1B]
+		#Cache-and-Go: S[1b]|Seq[4B] + Option[1B] + CRC8[1B]
 		#Split-and-Go: T[1b]|Seq[4B] + Order[1B] + CRC8[1B]
 		self.frame = struct.Struct('IBB')
 		self.buffer = ctypes.create_string_buffer(self.frame.size)
@@ -48,17 +48,18 @@ class QueueCoder:
 				(abs(self.count)&0x0F)
 				)
 
-	def build_struct(self, options, raw):
+	def build_struct(self, index, options, raw):
 		#raw_len = len(raw) #useless for now
+		seq_singed = ((index&0x01)<<31) & self.seq
 		self.crcFrame.pack_into(
 			self.crcBuffer, 0,
-			self.seq,#Sequence number
+			seq_singed,#Sequence number
 			options,#options section
 			)
 		crcValue = self.crcGen(self.crcBuffer)
 		self.frame.pack_into(
 			self.buffer, 0, 
-			self.seq, options, crcValue)
+			seq_singed, options, crcValue)
 		header = ctypes.string_at(
 			ctypes.addressof(self.buffer),
 			self.frame.size)
@@ -78,15 +79,17 @@ class QueueCoder:
 	def put(self, raw):
 		if abs(self.count) > abs(self.ratio): #critical point
 			self.count = 0
+			index = 1 - pos(self.ratio)
 			options = build_options()
-			frame = build_struct(raw, options)
-			self.tuple_q[1 - pos(self.ratio)].append(frame)
+			frame = build_struct(index, raw, options)
+			self.tuple_q[index].append(frame)
 			pass
 		else: #accumulation process
+			index = pos(self.ratio)
 			options = build_options()
-			frame = build_struct(raw, options)
+			frame = build_struct(index, raw, options)
 			self.count += sign(self.ratio)
-			self.tuple_q[pos(self.ratio)].append(frame)
+			self.tuple_q[index].append(frame)
 			pass
 		#here add for tx_window#
 		tmp = self.seq % self.sWindow

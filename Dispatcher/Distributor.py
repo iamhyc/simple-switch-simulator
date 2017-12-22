@@ -17,12 +17,7 @@ from Utility.Math import randomString
 
 class Distributor(multiprocessing.Process):
 	"""Non-Blocking running Distributor Process
-		@desc 
-		@var source:
-			data source for this distributor, 
-			default as static
-		@var queue:
-			multiprocess control side
+		@desc
 	"""
 	def __init__(self, task_id, fb_q, char, rf_tuple):
 		#1 Internal Init

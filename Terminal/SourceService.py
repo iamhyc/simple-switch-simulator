@@ -17,6 +17,7 @@ class RelayService(object):
 		pass
 
 	def init_ringbuffer(self):
+		# self.ringbuffer = [0] * self.config['sWindow_rx']
 		# for x in xrange(self.config['sWindow_rx']):
 		# 	self.ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
 		# 	pass
