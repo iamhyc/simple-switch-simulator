@@ -126,16 +126,11 @@ class Distributor(multiprocessing.Process):
 		seq, ptr, sWindow = 0, 0, sWindow
 		while True:
 			#add tx sliding window here#
-			if len(xmit_q):
-				seq += len(xmit_q)
-				while ptr<seq:
-					##ptr need adjust in feedback part
-					# if (seq-ptr)<self.sWindow[name]:
-					# 	ptr += 1
-					# 	data = xmit_q.popleft()
-					# 	xmit_skt.sendto(data, addr_tuple)
-					# 	pass
-					pass
+			if len(xmit_q) and (seq-ptr)<self.sWindow[name] :
+				seq += 1
+				ptr += 1 #ptr need adjust in feedback part
+				data = xmit_q.popleft()
+				xmit_skt.sendto(data, addr_tuple)
 				pass
 			pass
 		pass

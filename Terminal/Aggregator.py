@@ -28,8 +28,7 @@ class Aggregator(multiprocessing.Process):
 			'type':self.setType
 		}
 		self.config = load_json('./config.json')
-		# RingBuffer Init
-		# ringBuffer = [Seq, Size, sub1_Size, sub2_Size, Data]
+		#ringBuffer = [Seq, Ratio, Count, Data]
 		self.ringBuffer = [0] * self.config['sWindow_rx']
 		pass
 
@@ -81,16 +80,17 @@ class Aggregator(multiprocessing.Process):
 		self.proc_stop()
 		self.redist_stop()
 		self.init_ringbuffer()
+
 		#setup parameter
 		self.src_type, self.fhash, fsize, flength = cmd
 		self.size = int(fsize)
 		flength = float(flength)
 		#setup endpoint
 		self.numB = int(math.ceil(self.size / flength))
-		if self.numB<=0:#endless
+		if self.numB <= 0:#endless
 			self.numB = maxint
 			pass
-		#self.remains = self.size - self.numB*flength #zeros in last packet
+
 		self.thread_init()
 		self.redist_start()
 		self.proc_start()
