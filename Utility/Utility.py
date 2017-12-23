@@ -34,6 +34,31 @@ def cmd_parse(str):
 	return op, cmd
 	pass
 
+def unpack_helper(fmt, data):
+	unpack_data = [0] * len(fmt)
+	size = struct.calcsize(fmt)
+	try:
+		unpack_data, data = struct.unpack(fmt, data[:size]), data[size:]
+	except Exception as e:
+		pass
+	finally:
+		return unpack_data, data
+	pass
+
+def build_options(ratio, count):
+	#options: 4b for ratio, 4b for count
+	return (0xFF & 
+			(abs(ratio)&0x0F)<<4 & 
+			(abs(count)&0x0F)
+			)
+
+def parse_options(seq_s, options):
+	index = seq_s&(1<<31)
+	seq = seq_s&(0x7FFFFFFF)
+	ratio = (options&0xF0)>>4
+	count = (options&0x0F)
+	return (seq, index, ratio, count)
+
 def build_control(fid, ftype, fdata):
 	t = time.time()
 	ftype = contorl_type[ftype]
@@ -46,10 +71,6 @@ def parse_control(frame):
 	fid, ftype = (pad>>3)&0x01, pad&0x07
 	ftype = contorl_type.keys()[contorl_type.values().index(ftype)]
 	return seq, fid, ftype, fdata
-
-def unpack_helper(fmt, data):
-	    size = struct.calcsize(fmt)
-	    return struct.unpack(fmt, data[:size]), data[size:]
 
 def parse_frame(frame):
 	status = True if data[0]=='+' else False
@@ -139,4 +160,4 @@ class AlignExecutor:
 			pass
 		self.p2c_q.put(cmd)
 		return self.c2p_q.get()
-		
+	

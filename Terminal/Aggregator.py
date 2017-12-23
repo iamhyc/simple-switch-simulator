@@ -13,11 +13,21 @@ from collections import deque
 from SourceService import RelayService, CacheService
 from Utility.Utility import *
 
-class CountWindow(object):
+class CountWindow:
 	"""docstring for CountWindow"""
-	def __init__(self):
+	def __init__(self, ringBuffer):
 		#countWindow = [Seq, Ratio, Count, Data]
+		self.selected = 0 #q0
 		self.countWindow = deque()
+		self.ringBuffer = ringBuffer
+		pass
+
+	def add(self ,frame):
+		Seq, Index, Ratio, Count, Data = frame
+
+		pass
+
+	def clear(self, number): #ACK window
 		pass
 
 class Aggregator(multiprocessing.Process):
@@ -31,29 +41,31 @@ class Aggregator(multiprocessing.Process):
 		self.paused = True
 		self.req, self.res = rf_tuple
 		self.fb_tuple = fb_tuple
-		self.src_type = 'r' #default for stream
+		self.src_type = RelayService() #default for stream
 		self.ops_map = {
 			'set':self.setParam,
 			'type':self.setType
 		}
 		self.config = load_json('./config.json')
+		self.link_map = {'Wi-Fi':0,	'VLC':1}
 		pass
 
 	def thread_init(self):
 		#self.config['stream_wifi_port'], self.config['stream_vlc_port_rx']
 		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, 
-			args=('wifi', self.config['stream_wifi_port']))
+			args=('Wi-Fi', self.config['stream_wifi_port']))
 		self.wifiRecvHandle.setDaemon(True)
 
 		self.vlcRecvHandle = threading.Thread(target=self.RecvThread, 
-			args=('vlc', self.config['stream_vlc_port_rx']))
+			args=('VLC', self.config['stream_vlc_port_rx']))
 		self.vlcRecvHandle.setDaemon(True)
+
+		self.uplinkHandle = threading.Thread(target=self.uplinkThread, args=(self.fb_q, ))
+		self.uplinkHandle.setDaemon(True)
 		pass
 
 	def class_init(self):
 		self.count = CountWindow()
-		# feedback init
-		self.fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #uplink feedback socket
 		self.fb_q = Queue.Queue()
 		# Thread Handle Init
 		self.thread_init()
@@ -63,7 +75,7 @@ class Aggregator(multiprocessing.Process):
 	Process Helper Function
 	'''
 	def setParam(self, cmd):
-
+		self.start()
 		#setup parameter
 		self.src_type, self.fhash, fsize, flength = cmd
 		self.size = int(fsize)
@@ -73,12 +85,15 @@ class Aggregator(multiprocessing.Process):
 		if self.numB <= 0:#endless
 			self.numB = maxint
 			pass
-
+		self.stop()
 		self.res(True)
 		pass
 
 	def setType(self, src_type):
-		self.src_type = src_type
+		if src_type='c':
+			self.src_type = CacheService()
+		else:
+			self.src_type = RelayService()
 		self.res(True)
 		pass
 
@@ -86,10 +101,11 @@ class Aggregator(multiprocessing.Process):
 	Process Thread Function
 	'''
 	def uplinkThread(self, fb_q):
+		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		while not self.paused:
 			if not fb_q.empty():
 				frame = fb_q.get_nowait()
-				self.fb_skt.sendto(frame, self.fb_tuple)
+				fb_skt.sendto(frame, self.fb_tuple)
 				pass
 			pass
 		pass
@@ -98,34 +114,29 @@ class Aggregator(multiprocessing.Process):
 		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		recv_skt.bind(('', port))
 		recv_skt.setblocking(False)
-		raw, addr = recv_skt.recvfrom(4096)
-		printh(name.upper(), 'Now on ', 'green')
+		fid = self.link_map[name]
+		printh(name, 'Now on ', 'green')
 
 		while not self.paused:
 			try:
-				last_time = time.time()
 				raw, addr = recv_skt.recvfrom(4096)
-
-				(Seq, Size, Offset, CRC), Data = unpack_helper(self.config['struct'], raw)
-				data_len = len(Data)
-				#print('From %s link:(%d,%d,%d,%d,%s)'%(name, Seq, Size, Offset, CRC, Data)) #for debug
-
-
-				rate_inst = data_len / (time.time() - last_time)
-				build_control()
-				self.feedback(True, name, '%d'%(rate_inst))
+				(Seq_s, Options, CRC), Data = unpack_helper(self.config['control_t'], raw)
+				if False: #CRC verify here#
+					break
+				#print('From %s link:(%d,%s,%d,%s)'%(name, hex(Seq_s), Options, Data)) #for debug
+				data = parse_options(Seq_s, Options) #(Seq, Index, Ratio, Count)
+				data = data + (Data, )
+				self.count.add(data)
 				pass
 			except Exception as e:
 				pass
 			pass
-			pass
-		#after recv stop here
+		printh(name, 'paused ', 'red')
 		pass
 
-
 	def agg_exit(self):
-		#close socket here
-		#terminate thread here
+		self.src_type.stop()
+		self.stop()
 		printh('Aggregator', "Now exit...", 'red')
 		exit()
 		pass

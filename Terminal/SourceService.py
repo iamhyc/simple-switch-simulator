@@ -11,7 +11,7 @@ class RelayService(object):
 	"""docstring for RelayService
 	Receiver Phase II(Stream): Buffer Window, Closed Link Sense
 	"""
-	def __init__(self, fb_tuple):
+	def __init__(self, fb_q):
 		self.paused = True
 		self.fb_tuple = fb_tuple
 		pass

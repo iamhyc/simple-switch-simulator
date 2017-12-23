@@ -4,6 +4,7 @@ QueueEncoder: map one-queue 2 two-queue
 @author: Mark Hong
 @level: debug
 '''
+from Utility.Utility import build_options
 from Utility.Math import *
 
 class QueueCoder:
@@ -41,13 +42,6 @@ class QueueCoder:
 		self.seq = numA #restart packet sequence
 		pass
 
-	def build_options(self):
-		#options: 4b for self.ratio, 4b for self.count
-		return (0xFF & 
-				(abs(self.ratio)&0x0F)<<4 & 
-				(abs(self.count)&0x0F)
-				)
-
 	def build_struct(self, index, options, raw):
 		#raw_len = len(raw) #useless for now
 		seq_singed = ((index&0x01)<<31) & self.seq
@@ -70,7 +64,7 @@ class QueueCoder:
 		seq = seq % self.sWindow
 
 		raw = self.tx_window[seq]
-		options = build_options()
+		options = build_options(self.ratio, self.count)
 		frame = build_struct(raw, options)
 		#reput into the favorable side, without count balance
 		self.tuple_q[pos(self.ratio)].appendleft(frame)
@@ -80,13 +74,13 @@ class QueueCoder:
 		if abs(self.count) > abs(self.ratio): #critical point
 			self.count = 0
 			index = 1 - pos(self.ratio)
-			options = build_options()
+			options = build_options(self.ratio, self.count)
 			frame = build_struct(index, raw, options)
 			self.tuple_q[index].append(frame)
 			pass
 		else: #accumulation process
 			index = pos(self.ratio)
-			options = build_options()
+			options = build_options(self.ratio, self.count)
 			frame = build_struct(index, raw, options)
 			self.count += sign(self.ratio)
 			self.tuple_q[index].append(frame)

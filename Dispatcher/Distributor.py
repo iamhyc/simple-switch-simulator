@@ -29,9 +29,9 @@ class Distributor(multiprocessing.Process):
 		self.req, self.res 						= rf_tuple
 		#2 sliding window init
 		tmp = int(self.config['sWindow_tx'])/2
-		self.link_map	=	{0: 'Wi-Fi',	1:'VLC'}
-		self.sWindow	=	{'Wi-Fi': tmp,	'VLC': tmp}
-		self.ptr		=	{'Wi-Fi': 0,	'VLC': 0}
+		self.link_map	=	{'Wi-Fi':0,	'VLC':1}
+		self.sWindow	=	[tmp,	tmp]
+		self.ptr		=	[0,		0]
 		#2 plugin Source Init
 		data = randomString(64)
 		self.src = StreamSource(task_id, ["static", data]) #udp/file_p/static
@@ -103,12 +103,14 @@ class Distributor(multiprocessing.Process):
 
 	def XmitThread(self, name, addr_tuple, xmit_q, sWindow):
 		xmit_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		fid = self.link_map[name]
 		seq, sWindow = 0, sWindow
 		while True:
-			if len(xmit_q) and (seq-self.ptr[name])<self.sWindow[name] :
+			if len(xmit_q) and (seq-self.ptr[fid])<self.sWindow[fid] :
 				seq += 1
 				data = xmit_q.popleft()
 				xmit_skt.sendto(data, addr_tuple)
+				#print('To %s link: %s'%(name, data))
 				pass
 			pass
 		pass
@@ -126,15 +128,13 @@ class Distributor(multiprocessing.Process):
 					self.fb_q.put_nowait(frame)
 					pass
 				elif ftype=='ACK':
-					name = self.link_map(fid)
-					self.ptr[name] = fdata
+					self.ptr[fid] = fdata
 					pass
 				elif ftype=='NAK':
 					self.encoder.reput(fdata)
 					#sWindow shrink on tuple_q[fid]
 					pass
 				elif ftype=='BIAS': #rx smart sense
-					name = self.link_map(fid)
 					self.encoder.ratio += fdata
 					pass
 				else:
