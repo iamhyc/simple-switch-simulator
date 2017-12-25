@@ -11,27 +11,18 @@ class RelayService(object):
 	"""docstring for RelayService
 	Receiver Phase II(Stream): Buffer Window, Closed Link Sense
 	"""
-	def __init__(self, fb_q):
+	def __init__(self, ringBuffer, fb_q):
 		self.paused = True
-		self.fb_tuple = fb_tuple
+		self.ringBuffer = ringBuffer
+		self.fb_q = fb_q
 		pass
 
-	def init_ringbuffer(self):
-		# self.ringbuffer = [0] * self.config['sWindow_rx']
-		# for x in xrange(self.config['sWindow_rx']):
-		# 	self.ringBuffer[x] = [-1, -1, 0, 0, [chr(0)] * 4096]
-		# 	pass
-		# pass
-		pass
-
-	def feedbackThread(self,fb_q):
+	def feedback(self):
 		#build_control(0, 'RATE', inst_rate)
 		#build_control(0, 'ACK', seq)
 		#build_control(0, 'NAK', seq)
 		#build_control(0, 'BIAS', pos)
-		pass
-
-	def redistThread(self):
+		self.fb_q.put(fb_frame)
 		pass
 
 	def processThread(self):
@@ -41,9 +32,10 @@ class CacheService(object):
 	"""docstring for CacheService
 	Receiver Phase II(Content): Buffer Window, Closed Link Sense
 	"""
-	def __init__(self, fb_tuple):
+	def __init__(self, ringBuffer, fb_q):
 		self.paused = True
-		self.fb_tuple = fb_tuple
+		self.ringBuffer = ringBuffer
+		self.fb_q = fb_q
 		pass
 
 	def init_ringbuffer(self):

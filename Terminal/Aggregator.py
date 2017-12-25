@@ -13,23 +13,6 @@ from collections import deque
 from SourceService import RelayService, CacheService
 from Utility.Utility import *
 
-class CountWindow:
-	"""docstring for CountWindow"""
-	def __init__(self, ringBuffer):
-		#countWindow = [Seq, Ratio, Count, Data]
-		self.selected = 0 #q0
-		self.countWindow = deque()
-		self.ringBuffer = ringBuffer
-		pass
-
-	def add(self ,frame):
-		Seq, Index, Ratio, Count, Data = frame
-
-		pass
-
-	def clear(self, number): #ACK window
-		pass
-
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
 	Receiver Phase I: Count Window, Sliding Window, Selected link Sense
@@ -41,7 +24,6 @@ class Aggregator(multiprocessing.Process):
 		self.paused = True
 		self.req, self.res = rf_tuple
 		self.fb_tuple = fb_tuple
-		self.src_type = RelayService() #default for stream
 		self.ops_map = {
 			'set':self.setParam,
 			'type':self.setType
@@ -65,7 +47,12 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def class_init(self):
-		self.count = CountWindow()
+		self.buffer_q = Queue()
+		self.ringBuffer = deque(self.config['sWindow_rx'])
+		self.count = CountWindow(self.buffer_q, self.ringBuffer)
+		self.src_type = RelayService(
+						self.ringBuffer,
+						self.numB) #default for stream
 		self.fb_q = Queue.Queue()
 		# Thread Handle Init
 		self.thread_init()
@@ -91,9 +78,9 @@ class Aggregator(multiprocessing.Process):
 
 	def setType(self, src_type):
 		if src_type='c':
-			self.src_type = CacheService()
+			self.src_type = CacheService(self.ringBuffer)
 		else:
-			self.src_type = RelayService()
+			self.src_type = RelayService(self.ringBuffer)
 		self.res(True)
 		pass
 
@@ -110,13 +97,13 @@ class Aggregator(multiprocessing.Process):
 			pass
 		pass
 
-	def RecvThread(self, name, port): #phase I - Sliding Window
+	def RecvThread(self, name, port):
 		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		recv_skt.bind(('', port))
 		recv_skt.setblocking(False)
 		fid = self.link_map[name]
 		printh(name, 'Now on ', 'green')
-
+		#remain single link continuum<n> check here#
 		while not self.paused:
 			try:
 				raw, addr = recv_skt.recvfrom(4096)
@@ -126,7 +113,7 @@ class Aggregator(multiprocessing.Process):
 				#print('From %s link:(%d,%s,%d,%s)'%(name, hex(Seq_s), Options, Data)) #for debug
 				data = parse_options(Seq_s, Options) #(Seq, Index, Ratio, Count)
 				data = data + (Data, )
-				self.count.add(data)
+				self.buffer_q.put(data)
 				pass
 			except Exception as e:
 				pass
