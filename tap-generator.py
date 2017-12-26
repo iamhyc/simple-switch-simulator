@@ -3,9 +3,10 @@
 Aggregator: for data flow manipulation
 @author: Mark Hong
 '''
-import json, random, string, struct
-import socket
+import struct, socket
 from optparse import OptionParser
+from Utility.Utility import load_json, printh
+from Utility.Math import randomString
 
 global config, options
 
@@ -16,7 +17,7 @@ def main():
 
 	while True:
 		raw_input('Tap to continue...')
-		data = ''.join(random.choice(string.hexdigits.upper()) for x in range(options.len))
+		data = randomString(options.len)
 		for x in xrange(options.number):
 			skt.sendto(data, (options.server, config['udp_src_port']))
 		print(data)
@@ -24,9 +25,7 @@ def main():
 	pass
 
 if __name__ == '__main__':
-	with open('./config.json') as cf:
-		config = json.load(cf)
-		pass
+	config = load_json('./config.json')
 
 	parser = OptionParser()
 	parser.add_option("-s", "--server",

@@ -10,6 +10,7 @@ import os, json, socket
 from Dispatcher.Distributor import Distributor
 from Dispatcher.Algorithm import Algorithm
 from Utility.Utility import *
+from Utility.Ctrl import *
 
 global config
 global proc_map, proc_remap

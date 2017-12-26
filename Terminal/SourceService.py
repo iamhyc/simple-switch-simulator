@@ -5,9 +5,10 @@ SourceService: for data flow manipulation
 @level: debug
 '''
 import socket, struct, threading
-from Utility.Utility import printh, build_control
+from Utility.Utility import printh
+from Utility.Data import build_control
 
-class RelayService(object):
+class RelayService:
 	"""docstring for RelayService
 	Receiver Phase II(Stream): Buffer Window, Closed Link Sense
 	"""
@@ -25,10 +26,20 @@ class RelayService(object):
 		self.fb_q.put(fb_frame)
 		pass
 
+	def start(self):
+		pass
+
+	def stop(self):
+		pass
+
+	def is_alive(self):
+		return self.processHandle.is_alive()
+		pass
+
 	def processThread(self):
 		pass
 
-class CacheService(object):
+class CacheService:
 	"""docstring for CacheService
 	Receiver Phase II(Content): Buffer Window, Closed Link Sense
 	"""

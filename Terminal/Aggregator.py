@@ -1,4 +1,4 @@
-#! /usr/bin/python
+n#! /usr/bin/python
 '''
 Aggregator: for data flow manipulation
 @author: Mark Hong
@@ -12,6 +12,7 @@ from collections import deque
 
 from SourceService import RelayService, CacheService
 from Utility.Utility import *
+from Utility.Data import parse_options
 
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
@@ -33,7 +34,6 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def thread_init(self):
-		#self.config['stream_wifi_port'], self.config['stream_vlc_port_rx']
 		self.wifiRecvHandle = threading.Thread(target=self.RecvThread, 
 			args=('Wi-Fi', self.config['stream_wifi_port']))
 		self.wifiRecvHandle.setDaemon(True)
@@ -49,13 +49,38 @@ class Aggregator(multiprocessing.Process):
 	def class_init(self):
 		self.buffer_q = Queue()
 		self.ringBuffer = deque(self.config['sWindow_rx'])
-		self.count = CountWindow(self.buffer_q, self.ringBuffer)
-		self.src_type = RelayService(
+		self.count = CountWindow(
+						self.buffer_q, 
 						self.ringBuffer,
-						self.numB) #default for stream
+						self.fb_q)
+		self.src_type = RelayService(
+						self.numB,
+						self.ringBuffer,
+						self.fb_q) #default for stream
 		self.fb_q = Queue.Queue()
 		# Thread Handle Init
 		self.thread_init()
+		pass
+
+	def start(self):
+		self.paused = True
+		self.thread_init()
+		#sequence need adjust here
+		self.wifiRecvHandle.start()
+		self.vlcRecvHandle.start()
+		self.uplinkHandle.start()
+		self.count.start()
+		self.src_type.start()
+		pass
+
+	def stop(self):
+		self.paused = True
+		self.count.stop()
+		self.src_type.stop()
+		join_helper((self.wifiRecvHandle,
+					self.vlcRecvHandle,
+					self.uplinkHandle,
+					self.count, self.src_type))
 		pass
 
 	'''

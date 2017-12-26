@@ -6,17 +6,19 @@ SourceService: for data flow manipulation
 '''
 import threading
 
-class CountWindow(threading.Thread):
+class CountWindow:
 	"""docstring for CountWindow
 	Receiver Phase I: Count Windows as Sliding Window
 	"""
-	def __init__(self, buffer_q, bWindow):
+	def __init__(self, buffer_q, ringBuffer, fb_q):
 		self.paused = True
+		self.buffer = buffer_q #0
+		self.bWindow = ringBuffer #2
+		self.fb_q = fb_q
+		#internal init
+		self.selected = 0 #q0, 0 for Wi-Fi, 1 for VLC
+		self.sWindow = {} #1;hash for sort
 		#countWindow = [Seq, Ratio, Count, Data]
-		self.selected = 0 #q0
-		self.buffer = buffer_q
-		self.sWindow = {} #hash for sort
-		self.bWindow = ringBuffer
 		pass
 
 	def clear(self, number): #ACK window
@@ -32,10 +34,21 @@ class CountWindow(threading.Thread):
 			pass
 		pass
 
+	def start(self):
+		self.paused = False
+		self.runHandle = threading.Thread(target=self.runThread)
+		self.runHandle.setDaemon(True)
+		self.runHandle.start()
+		pass
+
 	def stop(self):
 		self.paused = True
 		pass
 
-	def run(self):
+	def is_alive(self):
+		return self.runHandle.is_alive()
+		pass
+
+	def runThread(self):
 		while not self.paused: self.process
 		pass

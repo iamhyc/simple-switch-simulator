@@ -4,7 +4,7 @@ QueueEncoder: map one-queue 2 two-queue
 @author: Mark Hong
 @level: debug
 '''
-from Utility.Utility import build_options
+from Utility.Data import build_options
 from Utility.Math import *
 
 class QueueCoder:
