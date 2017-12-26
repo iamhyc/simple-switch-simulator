@@ -48,7 +48,7 @@ class Aggregator(multiprocessing.Process):
 
 	def class_init(self):
 		self.buffer_q = Queue()
-		self.ringBuffer = deque(self.config['sWindow_rx'])
+		self.ringBuffer = deque([0] * self.config['sWindow_rx'])
 		self.count = CountWindow(
 						self.buffer_q, 
 						self.ringBuffer,
@@ -123,12 +123,16 @@ class Aggregator(multiprocessing.Process):
 		pass
 
 	def RecvThread(self, name, port):
+		fid = self.link_map[name]
 		recv_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		recv_skt.bind(('', port))
 		recv_skt.setblocking(False)
-		fid = self.link_map[name]
+		#internal init#
+		last_index = -1 #record last index
+		seqdo = 0 #zero-tolerance, should learn from link fragmentation
+		seqdo_l = deque([0] * (seqdo+1)) 
 		printh(name, 'Now on ', 'green')
-		#remain single link continuum<n> check here#
+
 		while not self.paused:
 			try:
 				raw, addr = recv_skt.recvfrom(4096)
@@ -137,6 +141,10 @@ class Aggregator(multiprocessing.Process):
 					break
 				#print('From %s link:(%d,%s,%d,%s)'%(name, hex(Seq_s), Options, Data)) #for debug
 				data = parse_options(Seq_s, Options) #(Seq, Index, Ratio, Count)
+				#single link check here
+				seq_adjacent(seqdo_l)
+				last_index = data[1]
+				#count window next
 				data = data + (Data, )
 				self.buffer_q.put(data)
 				pass

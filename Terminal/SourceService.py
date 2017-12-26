@@ -27,16 +27,22 @@ class RelayService:
 		pass
 
 	def start(self):
+		self.paused = False
+		self.processHandle = threading.Thread(target=processThread,
+				args=(0.5, ))
+		self.processHandle.setDaemon(True)
+		self.processHandle.start()
 		pass
 
 	def stop(self):
+		self.paused = True
 		pass
 
 	def is_alive(self):
 		return self.processHandle.is_alive()
 		pass
 
-	def processThread(self):
+	def processThread(self ,timeout):
 		pass
 
 class CacheService:
