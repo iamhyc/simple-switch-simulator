@@ -1,4 +1,3 @@
-n#! /usr/bin/python
 '''
 Aggregator: for data flow manipulation
 @author: Mark Hong
@@ -13,6 +12,13 @@ from collections import deque
 from SourceService import RelayService, CacheService
 from Utility.Utility import *
 from Utility.Data import parse_options
+
+def seq_measure():
+	#0, same window;1, adjacent window;-1, multi window
+	pass
+
+def seq_adjacent(diseq, data):
+	pass
 
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
@@ -112,6 +118,7 @@ class Aggregator(multiprocessing.Process):
 	'''
 	Process Thread Function
 	'''
+
 	def uplinkThread(self, fb_q):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		while not self.paused:
@@ -128,9 +135,9 @@ class Aggregator(multiprocessing.Process):
 		recv_skt.bind(('', port))
 		recv_skt.setblocking(False)
 		#internal init#
-		last_index = -1 #record last index
-		seqdo = 0 #zero-tolerance, should learn from link fragmentation
-		seqdo_l = deque([0] * (seqdo+1)) 
+		last_mark = 0 #record last mark
+		diseq = 0 #zero-tolerance, should learn from link fragmentation
+		diseq_l = deque([0] * (seqdo+1)) 
 		printh(name, 'Now on ', 'green')
 
 		while not self.paused:
@@ -140,10 +147,11 @@ class Aggregator(multiprocessing.Process):
 				if False: #CRC verify here#
 					break
 				#print('From %s link:(%d,%s,%d,%s)'%(name, hex(Seq_s), Options, Data)) #for debug
-				data = parse_options(Seq_s, Options) #(Seq, Index, Ratio, Count)
+				data = parse_options(Seq_s, Options) #(Seq, Mark, Ratio, Count)
 				#single link check here
-				seq_adjacent(seqdo_l)
-				last_index = data[1]
+				loss = seq_adjacent(data, last_mark)
+				[self.feedback(loss[x]) for x in xrange( len(loss) )]
+				last_mark = data[1]
 				#count window next
 				data = data + (Data, )
 				self.buffer_q.put(data)

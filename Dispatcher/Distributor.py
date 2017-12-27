@@ -1,4 +1,3 @@
-#! /usr/bin/python
 '''
 Dispatcher: for data flow manipulation
 @author: Mark Hong

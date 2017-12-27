@@ -25,6 +25,7 @@ def unpack_helper(fmt, data):
 		return unpack_data, data
 	pass
 
+#options pad#
 def build_options(ratio, count):
 	#options: 4b for ratio, 4b for count
 	return (0xFF & 
@@ -33,12 +34,13 @@ def build_options(ratio, count):
 			)
 
 def parse_options(seq_s, options):
-	index = seq_s&(1<<31)
+	mark = seq_s&(1<<31)
 	seq = seq_s&(0x7FFFFFFF)
 	ratio = (options&0xF0)>>4
 	count = (options&0x0F)
-	return (seq, index, ratio, count)
+	return (seq, mark, ratio, count)
 
+#control frame#
 def build_control(fid, ftype, fdata):
 	t = time.time()
 	ftype = frame_type[ftype]

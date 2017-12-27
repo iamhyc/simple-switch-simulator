@@ -1,4 +1,3 @@
-#! /usr/bin/python
 '''
 Source: Data Flow Source
 @author: Mark Hong

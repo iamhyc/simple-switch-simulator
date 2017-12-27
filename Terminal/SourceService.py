@@ -1,4 +1,3 @@
-#! /usr/bin/python
 '''
 SourceService: for data flow manipulation
 @author: Mark Hong
@@ -10,7 +9,7 @@ from Utility.Data import build_control
 
 class RelayService:
 	"""docstring for RelayService
-	Receiver Phase II(Stream): Buffer Window, Closed Link Sense
+	Receiver Phase III(Stream): Buffer Window, Fatal Sense
 	"""
 	def __init__(self, ringBuffer, fb_q):
 		self.paused = True
@@ -47,7 +46,7 @@ class RelayService:
 
 class CacheService:
 	"""docstring for CacheService
-	Receiver Phase II(Content): Buffer Window, Closed Link Sense
+	Receiver Phase III(Content): Buffer Window, Fatal Sense
 	"""
 	def __init__(self, ringBuffer, fb_q):
 		self.paused = True

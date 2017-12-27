@@ -1,4 +1,3 @@
-#! /usr/bin/python
 '''
 SourceService: for data flow manipulation
 @author: Mark Hong
@@ -8,7 +7,7 @@ import threading
 
 class CountWindow:
 	"""docstring for CountWindow
-	Receiver Phase I: Count Windows as Sliding Window
+	Receiver Phase II: Count Windows as Sliding Window
 	"""
 	def __init__(self, buffer_q, ringBuffer, fb_q):
 		self.paused = True

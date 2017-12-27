@@ -1,4 +1,3 @@
-#! /usr/bin/python
 '''
 QueueEncoder: map one-queue 2 two-queue
 @author: Mark Hong
@@ -42,9 +41,9 @@ class QueueCoder:
 		self.seq = numA #restart packet sequence
 		pass
 
-	def build_struct(self, index, options, raw):
+	def build_struct(self, mark, options, raw):
 		#raw_len = len(raw) #useless for now
-		seq_singed = ((index&0x01)<<31) & self.seq
+		seq_singed = ((mark&0x01)<<31) & self.seq
 		self.crcFrame.pack_into(
 			self.crcBuffer, 0,
 			seq_singed,#Sequence number
@@ -65,23 +64,24 @@ class QueueCoder:
 
 		raw = self.tx_window[seq]
 		options = build_options(self.ratio, self.count)
-		frame = build_struct(raw, options)
+		index = pos(self.ratio) #take selected link
+		frame = build_struct(0, options, raw) 
 		#reput into the favorable side, without count balance
-		self.tuple_q[pos(self.ratio)].appendleft(frame)
+		self.tuple_q[index].appendleft(frame)
 		pass
 
 	def put(self, raw):
-		if abs(self.count) > abs(self.ratio): #critical point
+		if abs(self.count) > abs(self.ratio): #put in q1
 			self.count = 0
 			index = 1 - pos(self.ratio)
 			options = build_options(self.ratio, self.count)
-			frame = build_struct(index, raw, options)
+			frame = build_struct(1, options, raw)
 			self.tuple_q[index].append(frame)
 			pass
-		else: #accumulation process
+		else: #put in q0
 			index = pos(self.ratio)
 			options = build_options(self.ratio, self.count)
-			frame = build_struct(index, raw, options)
+			frame = build_struct(0, options, raw)
 			self.count += sign(self.ratio)
 			self.tuple_q[index].append(frame)
 			pass

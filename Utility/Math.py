@@ -10,8 +10,8 @@ from crcmod import mkCrcFun
 def sign(num):
 	return num/abs(num)
 
-def pos(num):
-	return 0 if num>0 else 1
+def pos(num):#bias 0
+	return 0 if num>=0 else 1
 
 def randomString(len, dtype='hex'):
 	data = ''
