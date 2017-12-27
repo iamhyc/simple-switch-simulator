@@ -13,11 +13,24 @@ from SourceService import RelayService, CacheService
 from Utility.Utility import *
 from Utility.Data import parse_options
 
-def seq_measure():
-	#0, same window;1, adjacent window;-1, multi window
-	pass
+def seq_measure(data1, data2):
+	#0, same window;1, adjacent window;-1, window loss
+	(s1, m1, r1, c1) = data1
+	(s2, m2, r2, c2) = data2
+	s1i, s2i = (s1-c1), (s2-c2)
+	if (s2-s1)==(c2-c1): #same window
+		win_d, seq_d = 0, (s2-s1)
+		pass
+	elif (s2i-s1i)==(r1+m1-m2+2): #adjacent window
+		win_d = 1
+		seq_d = (c2+1) if m1==1 else (s2-s1-m2)
+		pass
+	else: #window shrink, or, window loss
+		win_d, seq_d = -1, -1
+		pass
+	return win_d, seq_d
 
-def seq_adjacent(diseq, data):
+def seq_get_loss(diseq, data):
 	pass
 
 class Aggregator(multiprocessing.Process):
