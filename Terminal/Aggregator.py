@@ -21,7 +21,7 @@ def seq_measure(data1, data2):
 	if (s2-s1)==(c2-c1): #same window
 		win_d, seq_d = 0, (s2-s1)
 		pass
-	elif (s2i-s1i)==(r1+m1-m2+2): #adjacent window
+	elif (s2i-s1i)==(r1+m1-m2+2) and (r2>=r1): #adjacent window
 		win_d = 1
 		seq_d = (c2+1) if m1==1 else (s2-s1-m2)
 		pass
@@ -30,8 +30,16 @@ def seq_measure(data1, data2):
 		pass
 	return win_d, seq_d
 
-def seq_get_loss(diseq, data):
-	pass
+def seq_get_loss(data, diseq_l):
+	loss = []
+	win_d, seq_d = seq_measure(data, diseq_l[-1])
+	if win_d==0:
+		loss = [x for x in xrange(data[0]-seq_d+1, data[0])]
+	elif win_d==1:
+		loss = []
+	else:
+		loss = []
+	return loss
 
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
@@ -67,12 +75,13 @@ class Aggregator(multiprocessing.Process):
 
 	def class_init(self):
 		self.buffer_q = Queue()
-		self.ringBuffer = deque([0] * self.config['sWindow_rx'])
+		self.ringBuffer = deque([[0,0] for x in xrange(self.config['sWindow_rx'])])
 		self.count = CountWindow(
 						self.buffer_q, 
 						self.ringBuffer,
 						self.fb_q)
 		self.src_type = RelayService(
+						self.config['content_client_port'],
 						self.numB,
 						self.ringBuffer,
 						self.fb_q) #default for stream
@@ -110,9 +119,10 @@ class Aggregator(multiprocessing.Process):
 		#setup parameter
 		self.src_type, self.fhash, fsize, flength = cmd
 		self.size = int(fsize)
+		self.length = int(flength)
 		flength = float(flength)
 		#setup endpoint
-		self.numB = int(math.ceil(self.size / flength))
+		self.numB = int(math.ceil(self.size / length))
 		if self.numB <= 0:#endless
 			self.numB = maxint
 			pass
@@ -122,16 +132,22 @@ class Aggregator(multiprocessing.Process):
 
 	def setType(self, src_type):
 		if src_type='c':
-			self.src_type = CacheService(self.ringBuffer)
+			self.src_type = CacheService(
+								(self.fhash, self.numB, self.size, self.flength),
+								self.ringBuffer,
+								self.fb_q)
 		else:
-			self.src_type = RelayService(self.ringBuffer)
+			self.src_type = RelayService(
+								self.config['content_client_port'],
+								self.numB,
+								self.ringBuffer,
+								self.fb_q) #default for stream
 		self.res(True)
 		pass
 
 	'''
 	Process Thread Function
 	'''
-
 	def uplinkThread(self, fb_q):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		while not self.paused:
@@ -148,9 +164,9 @@ class Aggregator(multiprocessing.Process):
 		recv_skt.bind(('', port))
 		recv_skt.setblocking(False)
 		#internal init#
-		last_mark = 0 #record last mark
+		count = 0
 		diseq = 0 #zero-tolerance, should learn from link fragmentation
-		diseq_l = deque([0] * (seqdo+1)) 
+		diseq_l = deque([0] * (diseq+1)) 
 		printh(name, 'Now on ', 'green')
 
 		while not self.paused:
@@ -162,9 +178,12 @@ class Aggregator(multiprocessing.Process):
 				#print('From %s link:(%d,%s,%d,%s)'%(name, hex(Seq_s), Options, Data)) #for debug
 				data = parse_options(Seq_s, Options) #(Seq, Mark, Ratio, Count)
 				#single link check here
-				loss = seq_adjacent(data, last_mark)
-				[self.feedback(loss[x]) for x in xrange( len(loss) )]
-				last_mark = data[1]
+				loss = seq_get_loss(data, diseq_l)
+				for x in xrange(len(loss)):
+					self.fb_q.put(build_control(fid,'NAK',loss[x]))
+					pass
+				count += 1
+				diseq_l[count % (diseq+1)] = data
 				#count window next
 				data = data + (Data, )
 				self.buffer_q.put(data)

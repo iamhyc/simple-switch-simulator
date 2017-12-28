@@ -17,6 +17,5 @@
 	"control_t":"IBi",
 	"sWindow_tx":7000,
 	"sWindow_rx":1000,
-	"Atimeout":0.30,
-	"Btimeout":0.10
+	"timeout":0.30
 }
