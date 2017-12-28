@@ -30,7 +30,7 @@ class Distributor(multiprocessing.Process):
 		tmp = int(self.config['sWindow_tx'])/2
 		self.link_map	=	{'Wi-Fi':0,	'VLC':1}
 		self.sWindow	=	[tmp,	tmp]
-		self.ptr		=	[0,		0]
+		self.acked		=	-1
 		#2 plugin Source Init
 		data = randomString(64)
 		self.src = StreamSource(task_id, ["static", data]) #udp/file_p/static
@@ -100,12 +100,12 @@ class Distributor(multiprocessing.Process):
 			pass
 		pass
 
-	def XmitThread(self, name, addr_tuple, xmit_q, sWindow):
+	def XmitThread(self, name, addr_tuple, xmit_q):
 		xmit_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		fid = self.link_map[name]
 		seq, sWindow = 0, sWindow
 		while True:
-			if len(xmit_q) and (seq-self.ptr[fid])<self.sWindow[fid] :
+			if len(xmit_q) and (seq-self.acked)<self.sWindow[fid] :
 				seq += 1
 				data = xmit_q.popleft()
 				xmit_skt.sendto(data, addr_tuple)
@@ -127,7 +127,7 @@ class Distributor(multiprocessing.Process):
 					self.fb_q.put_nowait(frame)
 					pass
 				elif ftype=='ACK':
-					self.ptr[fid] = fdata
+					self.acked = fdata
 					pass
 				elif ftype=='NAK':
 					self.encoder.reput(fdata)
