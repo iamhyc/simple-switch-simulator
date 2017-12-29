@@ -62,6 +62,7 @@ def default_op(op, cmd):
 def ls_op_wrapper(cmd=[]):
 	status, data = default_op('ls', cmd)
 	_cls()
+	data = ' '.join(data)
 	cprint("%s\n"%(data), 'green')
 	pass
 

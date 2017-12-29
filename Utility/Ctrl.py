@@ -6,8 +6,8 @@ Math: useful control function utilities
 '''
 
 def parse_frame(frame):
-	status = True if data[0]=='+' else False
-	res = '' if len(data)<1 else data[1:].split(' ')
+	status = True if frame[0]=='+' else False
+	res = '' if len(frame)<1 else frame[1:].split(' ')
 	return status, res
 
 def build_frame(status, ftype='', fdata=''):

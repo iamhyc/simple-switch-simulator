@@ -4,7 +4,7 @@ CountWindow: for data flow manipulation
 @level: debug
 '''
 import threading
-from utility.Data import build_control
+from Utility.Data import build_control
 
 class CountWindow:
 	"""docstring for CountWindow

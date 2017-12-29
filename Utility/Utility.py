@@ -50,7 +50,7 @@ def exec_watch(process, hook=None, fatal=False, gen=True):
 def join_helper(t_tuple):
 	for t in t_tuple:
 		try:
-			if not t.is_alive(): t.join()
+			if t.is_alive(): t.join()
 		except Exception as e:
 			raise e
 		pass

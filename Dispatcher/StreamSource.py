@@ -97,7 +97,7 @@ class static_ops_class:
 	def data_getsize_op(self):
 		return self.size
 
-	def data_read_op(self):
+	def data_read_op(self, length):
 		return zeroPadding(length, self.data)
 		pass
 	

@@ -3,18 +3,19 @@ QueueEncoder: map one-queue 2 two-queue
 @author: Mark Hong
 @level: debug
 '''
+import struct, ctypes
 from Utility.Data import build_options
 from Utility.Math import *
 
 class QueueCoder:
 	"""docstring for QueueCoder"""
-	def __init__(self, tuple_q, ratio_list, sWindow):
+	def __init__(self, ratio_init, tuple_q, sWindow):
 		self.tuple_q = tuple(tuple_q)
 		self.sWindow = sWindow
 		#Tx Ring Bufferd Window
 		self.tx_window = [chr(0)] * sWindow
 		#Distribution Parameter
-		self.ratio = 0 #'+' for q0, '-' for q1
+		self.ratio = ratio_init #'+' for q0, '-' for q1
 		self.count = 0 #'+' for q0, '-' for q1
 		self.seq = 0
 		pass

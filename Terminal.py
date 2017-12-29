@@ -90,7 +90,6 @@ def term_init():
 		"src-type":set_recv_type_op,
 		"idle":idle_work_op
 	}
-
 	# Server Socket Init
 	skt_res = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	skt_res.bind(('', config['converg_term_port']))
@@ -100,8 +99,8 @@ def term_init():
 
 	# Register Procedure
 	init_cmd = ('%s %s %s 0'%('add', options.wifi, options.vlc))
-	status, fb_port = request(init_cmd, skt_req, 3) #block until feedback
-	fb_port = int(fb_port)
+	status, res = request(init_cmd, skt_req, 3) #block until feedback
+	fb_port = int(res[0])
 	sock, addr = skt_res.accept() #accepet reverse TCP link
 	
 	# Init Aggregator Process
@@ -123,8 +122,7 @@ def term_init():
 
 
 def main():
-	term_init()
-	# Converg Layer Terminal
+	term_init() # Converg Layer Terminal
 
 	while True:
 		sock, addr = skt_res.accept()

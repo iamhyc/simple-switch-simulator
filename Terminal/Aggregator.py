@@ -9,6 +9,7 @@ from os import path
 from sys import maxint
 from collections import deque
 
+from CountWindow import CountWindow
 from SourceService import RelayService, CacheService
 from Utility.Utility import *
 from Utility.Data import parse_options
@@ -43,7 +44,7 @@ def seq_get_loss(data, diseq_l):
 
 class Aggregator(multiprocessing.Process):
 	"""docstring for Aggregator
-	Receiver Phase I: Count Window, Sliding Window, Selected link Sense
+	Receiver Phase I: Single Link Disorder, Selected link Sense
 	"""
 	def __init__(self, rf_tuple, fb_tuple):
 		super(Aggregator, self).__init__()
@@ -69,14 +70,15 @@ class Aggregator(multiprocessing.Process):
 			args=('VLC', self.config['stream_vlc_port_rx']))
 		self.vlcRecvHandle.setDaemon(True)
 
-		self.uplinkHandle = threading.Thread(target=self.uplinkThread, args=(self.fb_q, ))
+		self.uplinkHandle = threading.Thread(target=self.uplinkThread, args=())
 		self.uplinkHandle.setDaemon(True)
 		pass
 
 	def class_init(self):
-		self.buffer_q = Queue()
+		self.buffer_q = Queue.Queue()
+		self.fb_q = Queue.Queue()
 		self.ringBuffer = deque([[0,0] for x in xrange(self.config['sWindow_rx'])])
-		self.count = CountWindow(
+		self.cWindow = CountWindow(
 						self.buffer_q, 
 						self.ringBuffer,
 						self.fb_q)
@@ -85,37 +87,43 @@ class Aggregator(multiprocessing.Process):
 						self.numB,
 						self.ringBuffer,
 						self.fb_q) #default for stream
-		self.fb_q = Queue.Queue()
 		# Thread Handle Init
 		self.thread_init()
 		pass
 
-	def start(self):
-		self.paused = True
+	def agg_exit(self):
+		self.src_type.stop()
+		self.agg_stop()
+		printh('Aggregator', "Now exit...", 'red')
+		exit()
+		pass
+
+	def agg_start(self):
+		self.paused = False
 		self.thread_init()
 		#sequence need adjust here
 		self.wifiRecvHandle.start()
 		self.vlcRecvHandle.start()
 		self.uplinkHandle.start()
-		self.count.start()
+		self.cWindow.start()
 		self.src_type.start()
 		pass
 
-	def stop(self):
+	def agg_stop(self):
 		self.paused = True
-		self.count.stop()
+		self.cWindow.stop()
 		self.src_type.stop()
 		join_helper((self.wifiRecvHandle,
 					self.vlcRecvHandle,
 					self.uplinkHandle,
-					self.count, self.src_type))
+					self.cWindow, self.src_type))
 		pass
 
 	'''
 	Process Helper Function
 	'''
 	def setParam(self, cmd):
-		self.start()
+		self.agg_stop()
 		#setup parameter
 		self.src_type, self.fhash, fsize, flength = cmd
 		self.size = int(fsize)
@@ -126,33 +134,35 @@ class Aggregator(multiprocessing.Process):
 		if self.numB <= 0:#endless
 			self.numB = maxint
 			pass
-		self.stop()
+		self.agg_start()
 		self.res(True)
 		pass
 
 	def setType(self, src_type):
-		if src_type='c':
+		if src_type=='c':
 			self.src_type = CacheService(
 								(self.fhash, self.numB, self.size, self.flength),
 								self.ringBuffer,
-								self.fb_q)
+								self.fb_q
+								)
 		else:
-			self.src_type = RelayService(
+			self.src_type = RelayService( #default for stream
 								self.config['content_client_port'],
 								self.numB,
 								self.ringBuffer,
-								self.fb_q) #default for stream
+								self.fb_q
+								)
 		self.res(True)
 		pass
 
 	'''
 	Process Thread Function
 	'''
-	def uplinkThread(self, fb_q):
+	def uplinkThread(self):
 		fb_skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		while not self.paused:
-			if not fb_q.empty():
-				frame = fb_q.get_nowait()
+			if not self.fb_q.empty():
+				frame = self.fb_q.get_nowait()
 				fb_skt.sendto(frame, self.fb_tuple)
 				pass
 			pass
@@ -164,7 +174,7 @@ class Aggregator(multiprocessing.Process):
 		recv_skt.bind(('', port))
 		recv_skt.setblocking(False)
 		#internal init#
-		count = 0
+		maxSeq = 0
 		diseq = 0 #zero-tolerance, should learn from link fragmentation
 		diseq_l = deque([0] * (diseq+1)) 
 		printh(name, 'Now on ', 'green')
@@ -182,8 +192,8 @@ class Aggregator(multiprocessing.Process):
 				for x in xrange(len(loss)):
 					self.fb_q.put(build_control(fid,'NAK',loss[x]))
 					pass
-				count += 1
-				diseq_l[count % (diseq+1)] = data
+				maxSeq += 1
+				diseq_l[maxSeq % (diseq+1)] = data
 				#count window next
 				data = data + (Data, )
 				self.buffer_q.put(data)
@@ -192,13 +202,6 @@ class Aggregator(multiprocessing.Process):
 				pass
 			pass
 		printh(name, 'paused ', 'red')
-		pass
-
-	def agg_exit(self):
-		self.src_type.stop()
-		self.stop()
-		printh('Aggregator', "Now exit...", 'red')
-		exit()
 		pass
 
 	def run(self):

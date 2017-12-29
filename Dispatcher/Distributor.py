@@ -4,7 +4,6 @@ Dispatcher: for data flow manipulation
 @level: debug
 '''
 import thread, socket
-import struct, ctypes
 import multiprocessing
 from collections import deque
 from time import sleep, ctime
@@ -33,6 +32,7 @@ class Distributor(multiprocessing.Process):
 		self.acked		=	-1
 		#2 plugin Source Init
 		data = randomString(64)
+		print(data)
 		self.src = StreamSource(task_id, ["static", data]) #udp/file_p/static
 		#3 Operation Map Driver
 		self.ops_map = {
@@ -48,9 +48,22 @@ class Distributor(multiprocessing.Process):
 		self.wifi_q = deque()
 		self.vlc_q = deque()
 		self.encoder = QueueCoder(
+			0, #init ratio
 			(self.wifi_q,	self.vlc_q),
 			int(self.config['sWindow_tx'])
 		)
+		pass
+
+	def dist_start(self):
+		self.class_init()
+		self.src.class_init()
+		self.encoder.class_init()
+		pass
+
+	def dist_stop(self):
+		self.src.stop()
+		printh('%s %d'%("Client", self.task_id), "Now exit...", 'red')
+		exit()
 		pass
 
 	'''
@@ -127,14 +140,14 @@ class Distributor(multiprocessing.Process):
 					self.fb_q.put_nowait(frame)
 					pass
 				elif ftype=='ACK':
-					self.acked = fdata
+					self.acked = int(fdata)
 					pass
 				elif ftype=='NAK':
-					self.encoder.reput(fdata)
+					self.encoder.reput(int(fdata))
 					#sWindow shrink on tuple_q[fid]
 					pass
 				elif ftype=='BIAS': #rx smart sense
-					self.encoder.ratio += fdata
+					self.encoder.ratio += int(fdata)
 					pass
 				else:
 					raise Exception('control frame exception')
@@ -146,18 +159,6 @@ class Distributor(multiprocessing.Process):
 	'''
 	Process Entrance Function
 	'''
-	def dist_start(self):
-		self.class_init()
-		self.src.class_init()
-		self.encoder.class_init()
-		pass
-
-	def dist_stop(self):
-		self.src.stop()
-		printh('%s %d'%("Client", self.task_id), "Now exit...", 'red')
-		exit()
-		pass
-
 	def run(self):
 		try: # manipulate with process termination signal
 			self.dist_start()
